@@ -1,6 +1,4 @@
 import math
-from operator import truediv
-from unicodedata import name
 import numpy as np
 import mnist_loader
 from scipy.special import expit
@@ -17,7 +15,7 @@ class NeuralNetwork:
             for layer_nodes in sizes[1:]:
                 ## Creating a new layer
                 new_weights = np.random.randn(layer_nodes, inputs)
-                new_biases = [np.random.random() for _ in range(layer_nodes)]
+                new_biases = list(np.random.randn(layer_nodes, 1))
                 new_layer = Layer(weights=new_weights, biases=new_biases)
                 self.layers.append(new_layer)
 
@@ -61,8 +59,8 @@ class NeuralNetwork:
         delta_b = [biases * (-eta) for biases in gradient_b]
         ## Apply weight gradient
         for layer_num, layer in enumerate(self.layers):
-            layer.weights += delta_w[layer_num]
-            layer.biases += delta_b[layer_num]
+            layer.weights = layer.weights + delta_w[layer_num]
+            layer.biases = layer.biases + delta_b[layer_num]
 
     def test_network(self, test_data, num_of_datapoints=None):
         np.random.shuffle(test_data)
@@ -78,7 +76,7 @@ class NeuralNetwork:
             desired_outputs = data_point[1]
             real_outputs = self.process_input(inputs)
 
-            answer = classify_output(real_outputs, desired_outputs, certainty=0.75)
+            answer = classify_output(real_outputs, desired_outputs, certainty=0)
             if answer:
                 correct_answers_num += 1
         return correct_answers_num, num_of_datapoints, wrong_answers
@@ -87,6 +85,11 @@ class NeuralNetwork:
     def train_network(self, training_data, mini_batch_size=10, learning_rate=0.05, test_data=None, tests=None, epochs=1):
         total_inputs = len(training_data)
         
+        if test_data is not None:
+            print(f"Initial test")
+            correct, total, wrong_cases = self.test_network(test_data, tests)
+            print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
+
         for epoch_num in range(epochs):
             mini_batches = make_mini_batches(training_data, mini_batch_size)
 
@@ -127,8 +130,8 @@ class NeuralNetwork:
 
             layer_gradient_w, layer_gradient_b = layer.calculate_layer_gradients(expected_outputs, old_layer, previous_activations)
             
-            gradient_w[layer_index] += layer_gradient_w
-            gradient_b[layer_index] += layer_gradient_b
+            gradient_w[layer_index] = gradient_w[layer_index] + layer_gradient_w
+            gradient_b[layer_index] = gradient_b[layer_index] + layer_gradient_b
 
             old_layer = layer
 
@@ -151,7 +154,7 @@ class Layer:
 
     def calculate_outputs(self, input_object):
         ## Calculate weighed inputs of this layer (dot product of weights, previous activations + bias)
-        layer_weighed_inputs = np.asarray([float(np.dot(self.weights[node_index], input_object) + bias) for node_index, bias in enumerate(self.biases)])
+        layer_weighed_inputs = np.asarray([(np.dot(self.weights[node_index], input_object) + bias) for node_index, bias in enumerate(self.biases)])
         layer_activations = activation_function_from_array(layer_weighed_inputs)
         self.weighed_inputs = layer_weighed_inputs
         self.activations = layer_activations

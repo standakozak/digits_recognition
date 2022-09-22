@@ -1,6 +1,6 @@
 import math
 import numpy as np
-import mnist_loader
+import book_code.mnist_loader as mnist_loader
 
 
 class NeuralNetwork:
@@ -97,24 +97,6 @@ class NeuralNetwork:
 
             self.apply_gradients(gradient_w, gradient_b, learning_rate)
 
-
-    def stochastic_gradient_descent(self, training_data, epochs, mini_batch_size, learning_rate, test_data=None):
-        training_inputs_number = len(training_data)
-        for epoch_num in range(epochs):
-            # Splitting training data to same-sized mini-batches
-            np.random.shuffle(training_data)
-            training_batches = [
-                training_data[index:(mini_batch_size+index)] for index in range(0, len(training_data), mini_batch_size)
-            ]
-            
-            for mini_batch in training_batches:
-                self.update_mini_batch(mini_batch, learning_rate)
-
-            print(f"Epoch {epoch_num} completed!")
-
-
-    def update_mini_batch(self, batch, learning_rate):
-        pass
 
 class Layer:
     def __init__(self, weights, biases) -> None:

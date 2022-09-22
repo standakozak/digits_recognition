@@ -1,6 +1,6 @@
 import math
 import numpy as np
-import mnist_loader
+import book_code.mnist_loader as mnist_loader
 from scipy.special import expit
 
 
@@ -16,12 +16,17 @@ class NeuralNetwork:
                 ## Creating a new layer
                 new_weights = np.random.randn(layer_nodes, inputs)
                 new_biases = list(np.random.randn(layer_nodes, 1))
+
                 new_layer = Layer(weights=new_weights, biases=new_biases)
                 self.layers.append(new_layer)
 
                 inputs = layer_nodes  # Current number of nodes becomes the number of inputs for the next layer
 
     def process_input(self, input_object):
+        """
+        Feedforward algorithm -> goes through the network, updates weighed inputs and activations of each layer
+        Return activations of the last layer - network output
+        """
         current_activations = input_object
         
         for layer in self.layers:
@@ -35,24 +40,14 @@ class NeuralNetwork:
         return return_string
 
 
-    def calculate_cost_of_one_input(self, input_object, desired_outputs) -> int:
+    def calculate_cost_of_one_input(self, dp_input, desired_output) -> int:
         one_input_cost = 0
 
-        real_outputs = self.process_input(input_object)
-        for real_output, desired_output in zip(real_outputs, desired_outputs):
+        real_outputs = self.process_input(dp_input)
+        for real_output, desired_output in zip(real_outputs, desired_output):
             one_input_cost += math.pow((desired_output - real_output), 2)
         
         return one_input_cost
-    
-
-    def cost_of_multiple_inputs(self, inputs_list, desired_outputs) -> int:
-        total_cost = 0
-        num_of_inputs = len(inputs_list)
-        for input_object, output_object in zip(inputs_list, desired_outputs):
-            total_cost += self.calculate_cost_of_one_input(input_object, output_object)
-
-        return (total_cost / num_of_inputs)
-
 
     def apply_gradients(self, gradient_w, gradient_b, eta):
         delta_w = [weights * (-eta) for weights in gradient_w]
@@ -91,17 +86,17 @@ class NeuralNetwork:
             print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
 
         for epoch_num in range(epochs):
+            total_cost = 0
             mini_batches = make_mini_batches(training_data, mini_batch_size)
 
             for mini_batch_index, mini_batch in enumerate(mini_batches):
-                gradient_w = [np.zeros(layer.weights.shape) for layer in self.layers]
-                gradient_b = [np.zeros(layer.biases.shape) for layer in self.layers]
+                delta_gradient_w = [np.zeros(layer.weights.shape) for layer in self.layers]
+                delta_gradient_b = [np.zeros(layer.biases.shape) for layer in self.layers]
 
-                inputs = [data_point[0] for data_point in mini_batch]
-                outputs = [data_point[1] for data_point in mini_batch]
+                for datapoint_input, datapoint_output in mini_batch:
+                    delta_gradient_w, delta_gradient_b, cost = self.update_gradients(datapoint_input, datapoint_output, delta_gradient_w, delta_gradient_b)
 
-                for datapoint_input, datapoint_output in zip(inputs, outputs):
-                    gradient_w, gradient_b = self.update_gradients(datapoint_input, datapoint_output, gradient_w, gradient_b)
+                total_cost += cost
 
                 ### Testing after every batch
                 if test_data is not None and epochs == 1:
@@ -109,16 +104,20 @@ class NeuralNetwork:
                     correct, total, wrong_cases = self.test_network(test_data, tests)
                     print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
 
-                self.apply_gradients(gradient_w, gradient_b, learning_rate/mini_batch_size)
+                self.apply_gradients(delta_gradient_w, delta_gradient_b, learning_rate/mini_batch_size)
             
             if test_data is not None and epochs != 1:
                 print(f"{epoch_num+1}th epoch completed ({(epoch_num + 1)}/{epochs})")
+                print(f"Average cost: {total_cost / len(training_data)}")
                 correct, total, wrong_cases = self.test_network(test_data, tests)
                 print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
 
 
-    def update_gradients(self, inputs, expected_outputs, gradient_w, gradient_b):
-        self.calculate_cost_of_one_input(inputs, expected_outputs)
+    def update_gradients(self, dp_input, expected_output, gradient_w, gradient_b):
+        """
+        Calls the feedforward algorithm and then the backpropagation
+        """
+        one_input_cost = self.calculate_cost_of_one_input(dp_input, expected_output)
 
         old_layer = None
         ## next layer = layer[i+1]; previous layer = layer[i-1]
@@ -126,16 +125,16 @@ class NeuralNetwork:
             if layer_index > 0:
                 previous_activations = self.layers[layer_index-1].activations
             else:
-                previous_activations = inputs
+                previous_activations = dp_input
 
-            layer_gradient_w, layer_gradient_b = layer.calculate_layer_gradients(expected_outputs, old_layer, previous_activations)
+            layer_gradient_w, layer_gradient_b = layer.calculate_layer_gradients(expected_output, old_layer, previous_activations)
             
             gradient_w[layer_index] = gradient_w[layer_index] + layer_gradient_w
             gradient_b[layer_index] = gradient_b[layer_index] + layer_gradient_b
 
             old_layer = layer
 
-        return gradient_w, gradient_b
+        return gradient_w, gradient_b, one_input_cost
 
 
 class Layer:
@@ -162,8 +161,8 @@ class Layer:
 
     def calculate_output_node_values(self, expected_outputs):
         node_values = []
-        for weighed_input, expected_output in zip(self.weighed_inputs, expected_outputs):
-            cost_to_activation_derivative = self.cost_derivative(self.activations, expected_output)
+        for weighed_input, expected_output, activation in zip(self.weighed_inputs, expected_outputs, self.activations):
+            cost_to_activation_derivative = self.cost_derivative(activation, expected_output)
             activation_to_weighed_input_der = activation_derivative(weighed_input)
             node_values.append(cost_to_activation_derivative * activation_to_weighed_input_der)
         self.node_values = node_values
@@ -171,8 +170,10 @@ class Layer:
     def calculate_hidden_node_values(self, next_layer):
         next_node_values = next_layer.node_values
         current_node_values = []
-        for current_node_weights in next_layer.weights.T:
-            current_node_values.append(np.dot(current_node_weights, next_node_values))
+        for node_index, current_node_weights in enumerate(next_layer.weights.T):
+            activation_to_weighed_input_derivative = activation_derivative(self.weighed_inputs[node_index])
+            current_node_values.append(np.dot(current_node_weights, next_node_values) * activation_to_weighed_input_derivative)
+
         self.node_values = current_node_values
 
 
@@ -191,16 +192,18 @@ class Layer:
 
         return layer_gradient_w, layer_gradient_b
 
-    def cost_derivative(self, real_outputs, desired_outputs):
+    def cost_derivative(self, activation, desired_output):
         ###  dC
         ### ----
         ###  da 
         ### Partial derivative of the cost function and the real output
 
-        one_input_cost = 0
-        for real_output, desired_output in zip(real_outputs, desired_outputs):
-            one_input_cost += 2 * (real_output - desired_output)
-        return one_input_cost
+        #one_input_cost = 0
+        #for real_output, desired_output in zip(real_outputs, desired_outputs):
+        #    one_input_cost += 2 * (real_output - desired_output)
+        #return one_input_cost
+        return 2 * (activation - desired_output)
+
 
     def __repr__(self) -> str:
         return_string = f"Weights: {self.weights}, biases: {self.biases}"
@@ -209,8 +212,9 @@ class Layer:
 
 def activation_function(weighed_input):
     ## Sigmoid function
-    output = 1 / (1 + pow(math.e, -weighed_input))
-    return output
+
+    #output = 1 / (1 + pow(math.e, -weighed_input))
+    return expit(weighed_input)
 
 
 def activation_function_from_array(weighed_inputs):
@@ -234,9 +238,8 @@ def make_mini_batches(data, mini_batch_size):
 
 
 def classify_output(real_outputs, desired_output, certainty=0):
-    one_real_result = real_outputs.argmax()
-    one_desired_result = desired_output
-    if one_real_result == one_desired_result and max(real_outputs) > certainty:
+    real_result = real_outputs.argmax()
+    if real_result == desired_output and max(real_outputs) > certainty:
         return True
     return False
 

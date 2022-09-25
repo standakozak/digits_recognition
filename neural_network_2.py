@@ -22,15 +22,15 @@ class CrossEntropyCost:
     @staticmethod
     def cost_derivative(activation, desired_output):
         """
-        This method is not necessary - the formula to calculate the node values is simplified by calculate_node_value method
+        This method is not necessary - the formula to calculate the node values is simplified by calculate_node_values method
         """
         return (desired_output/activation) - ((1-desired_output)/(1-activation))
 
-    def calculate_node_value(self, activation, desired_output, weighted_input):
+    def calculate_node_values(self, activations, desired_outputs, weighted_inputs):
         """
         Calculates the node values of the output layer for computing the gradient vectors
         """
-        return activation - desired_output
+        return activations - desired_outputs
 
 
 class MeanSquaredErrorCost:
@@ -45,14 +45,14 @@ class MeanSquaredErrorCost:
         return one_input_cost
 
     @staticmethod
-    def cost_derivative(activation, desired_output):
-        return 2 * (activation - desired_output)
+    def cost_derivative(activations, desired_outputs):
+        return 2 * (activations - desired_outputs)
     
-    def calculate_node_value(self, activation, desired_output, weighted_input):
-        cost_to_activation_derivative = self.cost_derivative(activation, desired_output)
-        activation_to_weighted_input_der = activation_derivative(weighted_input)
-        node_value = cost_to_activation_derivative * activation_to_weighted_input_der
-        return node_value
+    def calculate_node_values(self, activations, desired_outputs, weighted_inputs):
+        cost_to_activation_derivatives = self.cost_derivative(activations, desired_outputs)
+        activation_to_weighted_input_der = activation_derivative(weighted_inputs)
+        node_values = cost_to_activation_derivatives * activation_to_weighted_input_der
+        return node_values
 
 
 class NeuralNetwork(object):
@@ -200,7 +200,7 @@ class Layer:
         ## Calculate weighted inputs of this layer (dot product of weights, previous activations + bias)
         #layer_weighted_inputs = np.asarray([(np.dot(self.weights[node_index], previous_activations) + bias) for node_index, bias in enumerate(self.biases)])
         layer_weighted_inputs = np.dot(self.weights, previous_activations) + self.biases
-        layer_activations = activation_function_from_array(layer_weighted_inputs)
+        layer_activations = activation_function(layer_weighted_inputs)
         self.weighted_inputs = layer_weighted_inputs
         self.activations = layer_activations
         return layer_activations
@@ -208,7 +208,7 @@ class Layer:
     def calculate_output_node_values(self, expected_outputs):
         node_values = []
         for weighted_input, expected_output, activation in zip(self.weighted_inputs, expected_outputs, self.activations):
-            node_value = self.cost_function.calculate_node_value(activation, expected_output, weighted_input)
+            node_value = self.cost_function.calculate_node_values(activation, expected_output, weighted_input)
             node_values.append(node_value)
 
         self.node_values = np.asarray(node_values)
@@ -216,7 +216,7 @@ class Layer:
     def calculate_hidden_node_values(self, next_layer):
         next_node_values = next_layer.node_values
         current_node_values = []
-        activation_derivatives = activation_derivative_from_array(self.weighted_inputs)
+        activation_derivatives = activation_derivative(self.weighted_inputs)
         current_node_values = np.dot(next_layer.weights.T, next_node_values) * activation_derivatives
         # for node_index, current_node_weights in enumerate(next_layer.weights.T):
         #     activation_to_weighted_input_derivative = activation_derivative(self.weighted_inputs[node_index])
@@ -257,30 +257,18 @@ class Layer:
         return_string = f"Weights: {self.weights}, biases: {self.biases}"
         return return_string
 
-
-def activation_function(weighted_input):
+def activation_function(weighted_inputs):
     ## Sigmoid function
-
-    #output = 1 / (1 + pow(math.e, -weighted_input))
-    return expit(weighted_input)
-
-
-def activation_function_from_array(weighted_inputs):
     outputs = expit(weighted_inputs)
     return outputs
 
 
-def activation_derivative(weighted_input):
+def activation_derivative(weighted_inputs):
     ## Derivative of the sigmoid function
     ###  da
     ### ----
     ###  dz
-    activation_value = activation_function(weighted_input)
-    return (activation_value * (1-activation_value))
-
-
-def activation_derivative_from_array(weighted_inputs):
-    activation_values = activation_function_from_array(weighted_inputs)
+    activation_values = activation_function(weighted_inputs)
     return activation_values * (1-activation_values)
 
 

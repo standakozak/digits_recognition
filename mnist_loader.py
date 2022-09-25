@@ -34,6 +34,17 @@ def shuffle_data(labels, images):
     return shuffled_labels, shuffled_images
 
 
+def load_mnist():
+    test_labels_path = "data/mnist/t10k-labels-idx1-ubyte.gz"
+    test_images_path = "data/mnist/t10k-images-idx3-ubyte.gz"
+    test_data = read_data(test_labels_path, test_images_path)
+
+    train_labels_path = "data/mnist/train-labels-idx1-ubyte.gz"
+    train_images_path = "data/mnist/train-images-idx3-ubyte.gz"
+    train_data = read_data(train_labels_path, train_images_path)
+    return (test_data, train_data)
+
+
 if __name__ == "__main__":
     test_labels_path = "data/fashion/t10k-labels-idx1-ubyte.gz"
     train_labels_path = "data/fashion/train-labels-idx1-ubyte.gz"

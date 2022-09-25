@@ -26,7 +26,7 @@ class CrossEntropyCost:
         """
         return (desired_output/activation) - ((1-desired_output)/(1-activation))
 
-    def calculate_node_value(self, activation, desired_output, weighed_input):
+    def calculate_node_value(self, activation, desired_output, weighted_input):
         """
         Calculates the node values of the output layer for computing the gradient vectors
         """
@@ -48,17 +48,15 @@ class MeanSquaredErrorCost:
     def cost_derivative(activation, desired_output):
         return 2 * (activation - desired_output)
     
-    def calculate_node_value(self, activation, desired_output, weighed_input):
+    def calculate_node_value(self, activation, desired_output, weighted_input):
         cost_to_activation_derivative = self.cost_derivative(activation, desired_output)
-        activation_to_weighed_input_der = activation_derivative(weighed_input)
-        node_value = cost_to_activation_derivative * activation_to_weighed_input_der
+        activation_to_weighted_input_der = activation_derivative(weighted_input)
+        node_value = cost_to_activation_derivative * activation_to_weighted_input_der
         return node_value
 
 
 class NeuralNetwork(object):
-
     def __init__(self, sizes=None, layers=None, cost_function=CrossEntropyCost) -> None:
-                
         self.cost_function = cost_function
 
         if layers is not None:
@@ -76,10 +74,8 @@ class NeuralNetwork(object):
 
                 inputs = layer_nodes  # Current number of nodes becomes the number of inputs for the next layer
 
-
-
     def __repr__(self) -> str:
-        return_string = f"Neural network with {len(self.layers)} layer(s)\n"
+        return_string = f"Neural network with {len(self.layers)} layer(s) and an input layer.\n"
         for layer_num, layer_object in enumerate(self.layers):
             return_string += f"{layer_num + 1}) {repr(layer_object)}\n"
         return return_string
@@ -170,19 +166,12 @@ class NeuralNetwork(object):
             layer.biases = layer.biases + delta_b[layer_num]
 
     def calculate_cost_of_one_input(self, dp_input, desired_output) -> int:
-        # one_input_cost = 0
-
-        # real_outputs = self.process_input(dp_input)
-        # for real_output, desired_output in zip(real_outputs, desired_output):
-        #     one_input_cost += math.pow((desired_output - real_output), 2)
-        
-        # return one_input_cost
-        activations = self.process_input(dp_input)
-        return self.cost_function.calculate_cost(activations, desired_output)
+        outputs = self.process_input(dp_input)
+        return self.cost_function.calculate_cost(outputs, desired_output)
 
     def process_input(self, input_object):
         """
-        Feedforward algorithm -> goes through the network, updates weighed inputs and activations of each layer
+        Feedforward algorithm -> goes through the network, updates weighted inputs and activations of each layer
         Return activations of the last layer - network output
         """
         current_activations = input_object
@@ -203,36 +192,37 @@ class Layer:
         self.node_values = []
 
         self.activations = np.zeros(self.biases.shape)  # Stores the activation values (outputs of this layer)
-        self.weighed_inputs = np.zeros(self.biases.shape)  # Stores outputs of this layer before going through the activation function
+        self.weighted_inputs = np.zeros(self.biases.shape)  # Stores outputs of this layer before going through the activation function
 
         self.cost_function = cost_function
 
-    def calculate_outputs(self, input_object):
-        ## Calculate weighed inputs of this layer (dot product of weights, previous activations + bias)
-        layer_weighed_inputs = np.asarray([(np.dot(self.weights[node_index], input_object) + bias) for node_index, bias in enumerate(self.biases)])
-        layer_activations = activation_function_from_array(layer_weighed_inputs)
-        self.weighed_inputs = layer_weighed_inputs
+    def calculate_outputs(self, previous_activations):
+        ## Calculate weighted inputs of this layer (dot product of weights, previous activations + bias)
+        #layer_weighted_inputs = np.asarray([(np.dot(self.weights[node_index], previous_activations) + bias) for node_index, bias in enumerate(self.biases)])
+        layer_weighted_inputs = np.dot(self.weights, previous_activations) + self.biases
+        layer_activations = activation_function_from_array(layer_weighted_inputs)
+        self.weighted_inputs = layer_weighted_inputs
         self.activations = layer_activations
         return layer_activations
 
     def calculate_output_node_values(self, expected_outputs):
         node_values = []
-        for weighed_input, expected_output, activation in zip(self.weighed_inputs, expected_outputs, self.activations):
-            node_value = self.cost_function.calculate_node_value(activation, expected_output, weighed_input)
+        for weighted_input, expected_output, activation in zip(self.weighted_inputs, expected_outputs, self.activations):
+            node_value = self.cost_function.calculate_node_value(activation, expected_output, weighted_input)
             node_values.append(node_value)
-            # cost_to_activation_derivative = self.cost_function.cost_derivative(activation, expected_output)
-            # activation_to_weighed_input_der = activation_derivative(weighed_input)
-            # node_values.append(cost_to_activation_derivative * activation_to_weighed_input_der)
-        self.node_values = node_values
+
+        self.node_values = np.asarray(node_values)
 
     def calculate_hidden_node_values(self, next_layer):
         next_node_values = next_layer.node_values
         current_node_values = []
-        for node_index, current_node_weights in enumerate(next_layer.weights.T):
-            activation_to_weighed_input_derivative = activation_derivative(self.weighed_inputs[node_index])
-            current_node_values.append(np.dot(current_node_weights, next_node_values) * activation_to_weighed_input_derivative)
+        activation_derivatives = activation_derivative_from_array(self.weighted_inputs)
+        current_node_values = np.dot(next_layer.weights.T, next_node_values) * activation_derivatives
+        # for node_index, current_node_weights in enumerate(next_layer.weights.T):
+        #     activation_to_weighted_input_derivative = activation_derivative(self.weighted_inputs[node_index])
+        #     current_node_values.append(np.dot(current_node_weights, next_node_values) * activation_to_weighted_input_derivative)
 
-        self.node_values = current_node_values
+        self.node_values = np.asarray(current_node_values)
 
 
     def calculate_layer_gradients(self, expected_outputs, next_layer, previous_activations):
@@ -268,25 +258,30 @@ class Layer:
         return return_string
 
 
-def activation_function(weighed_input):
+def activation_function(weighted_input):
     ## Sigmoid function
 
-    #output = 1 / (1 + pow(math.e, -weighed_input))
-    return expit(weighed_input)
+    #output = 1 / (1 + pow(math.e, -weighted_input))
+    return expit(weighted_input)
 
 
-def activation_function_from_array(weighed_inputs):
-    outputs = expit(weighed_inputs)
+def activation_function_from_array(weighted_inputs):
+    outputs = expit(weighted_inputs)
     return outputs
 
 
-def activation_derivative(weighed_input):
+def activation_derivative(weighted_input):
     ## Derivative of the sigmoid function
     ###  da
     ### ----
     ###  dz
-    activation_value = activation_function(weighed_input)
+    activation_value = activation_function(weighted_input)
     return (activation_value * (1-activation_value))
+
+
+def activation_derivative_from_array(weighted_inputs):
+    activation_values = activation_function_from_array(weighted_inputs)
+    return activation_values * (1-activation_values)
 
 
 def make_mini_batches(data, mini_batch_size):

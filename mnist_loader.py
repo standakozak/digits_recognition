@@ -5,58 +5,83 @@ import matplotlib.pyplot as plt
 import os
 
 
-def read_labels(rel_path, lab_offset=8):
+def load_images(rel_path, length, resolution=28, img_offset=16):
+    file_path = os.path.abspath(rel_path)
+    with gzip.open(file_path, "rb") as images_file:
+        images = np.frombuffer(images_file.read(), dtype=np.uint8, offset=img_offset).reshape(length, resolution**2, 1)
+        return np.asarray(images/255)
+
+
+def load_labels(rel_path, lab_offset=8):
     file_path = os.path.abspath(rel_path)
     with gzip.open(file_path, "rb") as labels_file:
         labels = np.frombuffer(labels_file.read(), dtype=np.uint8, offset=lab_offset)
-        return labels
+        return np.asarray(labels)
 
 
-def read_images(rel_path, length, resolution=28, img_offset=16):
-    file_path = os.path.abspath(rel_path)
-    with gzip.open(file_path, "rb") as images_file:
-        images = np.frombuffer(images_file.read(), dtype=np.uint8, offset=img_offset).reshape(length, resolution**2)
-        return images
+def load_data(img_path, lab_path, resolution=28, img_offset=16, lab_offset=8):
+    labels = load_labels(lab_path, lab_offset)
+    images = load_images(img_path, length=len(labels), resolution=resolution, img_offset=img_offset)
+    return list(zip(images, labels))
 
 
-def read_data(lab_path, img_path, resolution=28, img_offset=16, lab_offset=8):
-    labels = read_labels(lab_path, lab_offset)
-    images = read_images(img_path, length=len(labels), resolution=resolution, img_offset=img_offset)
-    return labels, images
+def shuffle_data(data):
+    new_data = data.copy()
+    np.random.shuffle(new_data)
+    return new_data
 
 
-def shuffle_data(labels, images):
-    indices = np.arange(labels.shape[0])
-    np.random.shuffle(indices)
+def vectorize_train_data(train_data):
+    vectorized_train_data = []
+    for input, output_number in train_data:
+        new_outputs = np.zeros((10, 1))
+        new_outputs[output_number] = 1.0
+        vectorized_train_data.append((input, new_outputs))
+    return vectorized_train_data
 
-    shuffled_labels = labels[indices]
-    shuffled_images = images[indices]
-    return shuffled_labels, shuffled_images
+
+def split_validation_train_data(all_train_data, validation_data_num):
+    if validation_data_num:
+        validation_data = (all_train_data[-validation_data_num:])
+        train_data = (all_train_data[:-validation_data_num])
+    else:
+        validation_data = []
+        train_data = all_train_data
+    vectorized_train_data = vectorize_train_data(train_data)
+    return vectorized_train_data, validation_data
 
 
-def load_mnist():
-    test_labels_path = "data/mnist/t10k-labels-idx1-ubyte.gz"
+def load_mnist(validation_data_num=10000):
     test_images_path = "data/mnist/t10k-images-idx3-ubyte.gz"
-    test_data = read_data(test_labels_path, test_images_path)
+    test_labels_path = "data/mnist/t10k-labels-idx1-ubyte.gz"
+    test_data = load_data(test_images_path, test_labels_path)
 
-    train_labels_path = "data/mnist/train-labels-idx1-ubyte.gz"
     train_images_path = "data/mnist/train-images-idx3-ubyte.gz"
-    train_data = read_data(train_labels_path, train_images_path)
-    return (test_data, train_data)
+    train_labels_path = "data/mnist/train-labels-idx1-ubyte.gz"
+    all_train_data = load_data(train_images_path, train_labels_path)
+    train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
+    
+    return (train_data, validation_data, test_data)
+
+def load_fashion(validation_data_num=10000):
+    test_images_path = "data/fashion/t10k-images-idx3-ubyte.gz"
+    test_labels_path = "data/fashion/t10k-labels-idx1-ubyte.gz"    
+    test_data = load_data(test_images_path, test_labels_path)
+
+    train_images_path = "data/fashion/train-images-idx3-ubyte.gz"
+    train_labels_path = "data/fashion/train-labels-idx1-ubyte.gz"
+    all_train_data = load_data(train_images_path, train_labels_path)
+    train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
+
+    return (train_data, validation_data, test_data)
 
 
 if __name__ == "__main__":
-    test_labels_path = "data/fashion/t10k-labels-idx1-ubyte.gz"
-    train_labels_path = "data/fashion/train-labels-idx1-ubyte.gz"
-
-    test_images_path = "data/fashion/t10k-images-idx3-ubyte.gz"
-    train_images_path = "data/fashion/train-images-idx3-ubyte.gz"
-
     image_resolution = 28
-    test_labels, test_images = read_data(test_labels_path, test_images_path)
-    shuffled_labels, shuffled_images = shuffle_data(test_labels, test_images)
+    train_data, validation_data, test_data = load_mnist()
+    shuffled_test = shuffle_data(test_data)
   
     for image_index in range(0, 9):
         plt.subplot(330 + 1 + image_index)
-        plt.imshow(shuffled_images[image_index].reshape(image_resolution, image_resolution), cmap=plt.get_cmap("gray"))
+        plt.imshow(shuffled_test[image_index][0].reshape(image_resolution, image_resolution), cmap=plt.get_cmap("gray"))
     plt.show()

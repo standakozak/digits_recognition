@@ -1,8 +1,10 @@
-from argparse import ONE_OR_MORE
 import math
+import sys
 import numpy as np
 import book_code.mnist_loader as mnist_loader
 from scipy.special import expit
+
+import json
 
 
 class CrossEntropyCost:
@@ -14,9 +16,7 @@ class CrossEntropyCost:
         y = np.asarray(desired_outputs)
         a = np.asarray(activations)
         one_input_cost = np.sum(np.nan_to_num(-y*np.log(a)-(1-y)*np.log(1-a)))
-        # one_input_cost = 0
-        # for real_output, desired_output in zip(real_outputs, desired_outputs):
-        #     one_input_cost += np.nan_to_num(-desired_output * np.log(real_output) - (1-desired_output) * np.log(1-real_output))
+        
         return one_input_cost
     
     @staticmethod
@@ -58,6 +58,7 @@ class MeanSquaredErrorCost:
 class NeuralNetwork(object):
     def __init__(self, sizes=None, layers=None, cost_function=CrossEntropyCost) -> None:
         self.cost_function = cost_function
+        self.sizes = sizes
 
         if layers is not None:
             self.layers = layers
@@ -80,6 +81,18 @@ class NeuralNetwork(object):
             return_string += f"{layer_num + 1}) {repr(layer_object)}\n"
         return return_string
 
+    def save_network(self, file_name):
+        weights = [layer.weights.tolist() for layer in self.layers]
+        biases = [layer.biases.tolist() for layer in self.layers]
+        data = {
+            "sizes": self.sizes,
+            "cost": self.cost_function.__class__.__name__,
+            "weights": weights,
+            "biases": biases
+        }
+        with open(file_name, "w") as file:
+            json.dump(data, file)
+
     def test_network(self, test_data, num_of_datapoints=None):
         np.random.shuffle(test_data)
         if num_of_datapoints is None:
@@ -97,6 +110,8 @@ class NeuralNetwork(object):
             answer = classify_output(real_outputs, desired_outputs, certainty=0)
             if answer:
                 correct_answers_num += 1
+            else:
+                wrong_answers.append((inputs, desired_outputs, real_outputs))
         return correct_answers_num, num_of_datapoints, wrong_answers
 
     def train_network(self, training_data, mini_batch_size=10, learning_rate=0.05, test_data=None, tests=None, epochs=1):
@@ -120,7 +135,7 @@ class NeuralNetwork(object):
 
                 total_cost += cost
 
-                ### Testing after every batch
+                ### Testing after each batch
                 if test_data is not None and epochs == 1:
                     print(f"{mini_batch_index+1}th mini-batch completed ({(mini_batch_index + 1)*mini_batch_size}/{total_inputs})")
                     correct, total, wrong_cases = self.test_network(test_data, tests)
@@ -128,6 +143,7 @@ class NeuralNetwork(object):
 
                 self.apply_gradients(delta_gradient_w, delta_gradient_b, learning_rate/mini_batch_size)
             
+            # Testing after each epoch
             if test_data is not None and epochs != 1:
                 print(f"{epoch_num+1}th epoch completed ({(epoch_num + 1)}/{epochs})")
                 print(f"Average cost: {total_cost / len(training_data)}")
@@ -184,7 +200,7 @@ class Layer:
     def __init__(self, weights, biases, cost_function) -> None:
         # Sets the layer's weights and biases
         # Parameters: weights: list of lists of ints ([1, 1], [1, 1], [1, 1]) for layer of three nodes and two inputs
-        #             (In other words: shape of - layer nodes(outputs), input_nodes)
+        #             (shape = layer nodes(outputs), input_nodes)
         #             biases: list of ints
 
         self.weights = np.asarray(weights)
@@ -198,7 +214,7 @@ class Layer:
 
     def calculate_outputs(self, previous_activations):
         ## Calculate weighted inputs of this layer (dot product of weights, previous activations + bias)
-        #layer_weighted_inputs = np.asarray([(np.dot(self.weights[node_index], previous_activations) + bias) for node_index, bias in enumerate(self.biases)])
+        
         layer_weighted_inputs = np.dot(self.weights, previous_activations) + self.biases
         layer_activations = activation_function(layer_weighted_inputs)
         self.weighted_inputs = layer_weighted_inputs
@@ -218,9 +234,6 @@ class Layer:
         current_node_values = []
         activation_derivatives = activation_derivative(self.weighted_inputs)
         current_node_values = np.dot(next_layer.weights.T, next_node_values) * activation_derivatives
-        # for node_index, current_node_weights in enumerate(next_layer.weights.T):
-        #     activation_to_weighted_input_derivative = activation_derivative(self.weighted_inputs[node_index])
-        #     current_node_values.append(np.dot(current_node_weights, next_node_values) * activation_to_weighted_input_derivative)
 
         self.node_values = np.asarray(current_node_values)
 
@@ -246,10 +259,6 @@ class Layer:
         ###  da 
         ### Partial derivative of the cost function and the real output
 
-        #one_input_cost = 0
-        #for real_output, desired_output in zip(real_outputs, desired_outputs):
-        #    one_input_cost += 2 * (real_output - desired_output)
-        #return one_input_cost
         return 2 * (activation - desired_output)
 
 
@@ -285,7 +294,20 @@ def classify_output(real_outputs, desired_output, certainty=0):
     return False
 
 
+def load_network(file_name):
+    with open(file_name, "r") as file:
+        data = json.load(file)
+    cost_function = getattr(sys.modules[__name__], data["cost"])
+    cost = cost_function()
+    layers = []
+    for layer_weights, layer_biases in zip(data["weights"], data["biases"]):
+        new_layer = Layer(layer_weights, layer_biases, cost)
+        layers.append(new_layer)
+    net = NeuralNetwork(sizes=data["sizes"], layers=layers, cost_function=cost)
+    return net
+
+
 if __name__ == "__main__":
-    digits_recognition_neural_network = NeuralNetwork([784, 30, 10])
+    digits_network = NeuralNetwork([784, 30, 10], cost_function=CrossEntropyCost())
     training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
-    digits_recognition_neural_network.train_network(training_data, mini_batch_size=100, learning_rate=3, test_data=test_data, tests=2000, epochs=2)
+    digits_network.train_network(training_data, mini_batch_size=10, learning_rate=0.5, test_data=test_data, tests=10000, epochs=10)

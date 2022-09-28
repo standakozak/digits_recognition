@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageTk
 
 
-class CanvasDrawing:
+class CanvasDrawing(tkinter.Frame):
     WIDTH_DRAW_CANVAS = 560
     HEIGHT_DRAW_CANVAS = 560
 
@@ -16,11 +16,14 @@ class CanvasDrawing:
     WIDTH_FACTOR = WIDTH_DRAW_CANVAS // ARRAY_COLS
     HEIGHT_FACTOR = HEIGHT_DRAW_CANVAS // ARRAY_ROWS
 
-    def __init__(self, root):
-        self.root = root
-        self.canvas_draw = tkinter.Canvas(self.root, bg="white", height=self.HEIGHT_DRAW_CANVAS, width=self.WIDTH_DRAW_CANVAS)
+    def __init__(self, container, controller):
+        tkinter.Frame.__init__(self, container)
+        self.root = container
+        self.controller = controller
+
+        self.canvas_draw = tkinter.Canvas(self, bg="white", height=self.HEIGHT_DRAW_CANVAS, width=self.WIDTH_DRAW_CANVAS)
         self.canvas_draw.grid(column="0", row="0")
-        self.canvas_show = tkinter.Canvas(self.root, bg="white", height=self.HEIGHT_SHOW_CANVAS, width=self.WIDTH_SHOW_CANVAS)
+        self.canvas_show = tkinter.Canvas(self, bg="white", height=self.HEIGHT_SHOW_CANVAS, width=self.WIDTH_SHOW_CANVAS)
         self.canvas_show.grid(column="1", row="0")
 
         self.pil_image = Image.new("P", (self.WIDTH_DRAW_CANVAS, self.HEIGHT_DRAW_CANVAS), (255, 255, 255))
@@ -30,6 +33,8 @@ class CanvasDrawing:
         self.canvas_draw.bind("<B1-Motion>", self.draw)
         self.canvas_draw.bind("<Button-3>", self.get_x_and_y)
         self.canvas_draw.bind("<B3-Motion>", self.clear)
+
+        tkinter.Button(self, text='Back', bg='#FFFFFF', font=('arial', 15, 'normal'), command=lambda: self.controller.show_frame("MainScreen")).place(x=428, y=550)
 
     def create_resized_image(self):
         original_image = self.pil_image
@@ -68,5 +73,8 @@ class CanvasDrawing:
         self.draw_on_both_canvases(event=event, width=16, color="white")
     
     def clear_frame(self, event):
-        for widget in self.root.winfo_children():
+        for widget in self.winfo_children():
             widget.destroy()
+
+    def update_buttons(self, network_created=False, network_running=False, epochs_to_run=0):
+        pass

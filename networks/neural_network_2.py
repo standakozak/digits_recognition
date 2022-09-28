@@ -55,8 +55,49 @@ class MeanSquaredErrorCost:
         return node_values
 
 
+def activation_function(weighted_inputs):
+    ## Sigmoid function
+    outputs = expit(weighted_inputs)
+    return outputs
+
+
+def activation_derivative(weighted_inputs):
+    ## Derivative of the sigmoid function
+    ###  da
+    ### ----
+    ###  dz
+    activation_values = activation_function(weighted_inputs)
+    return activation_values * (1-activation_values)
+
+
+def make_mini_batches(data, mini_batch_size):
+    np.random.shuffle(data)
+    mini_batches = [data[index:index+mini_batch_size] for index in range(0, len(data), mini_batch_size)]
+    return mini_batches
+
+
+def classify_output(real_outputs, desired_output, certainty=0):
+    real_result = real_outputs.argmax()
+    if real_result == desired_output and max(real_outputs) > certainty:
+        return True
+    return False
+
+
+def load_network(file_name):
+    with open(file_name, "r") as file:
+        data = json.load(file)
+    cost_function = getattr(sys.modules[__name__], data["cost"])
+    cost = cost_function()
+    layers = []
+    for layer_weights, layer_biases in zip(data["weights"], data["biases"]):
+        new_layer = Layer(layer_weights, layer_biases, cost)
+        layers.append(new_layer)
+    net = NeuralNetwork(sizes=data["sizes"], layers=layers, cost_function=cost)
+    return net
+
+
 class NeuralNetwork(object):
-    def __init__(self, sizes=None, layers=None, cost_function=CrossEntropyCost) -> None:
+    def __init__(self, sizes=None, layers=None, cost_function=CrossEntropyCost(), activation_function=activation_function) -> None:
         self.cost_function = cost_function
         self.sizes = sizes
 
@@ -114,7 +155,9 @@ class NeuralNetwork(object):
                 wrong_answers.append((inputs, desired_outputs, real_outputs))
         return correct_answers_num, num_of_datapoints, wrong_answers
 
-    def train_network(self, training_data, mini_batch_size=10, learning_rate=0.05, test_data=None, tests=None, epochs=1):
+    def train_network(self, training_data, mini_batch_size=10, learning_rate=0.05, test_data=None, tests=None, epochs=1, regularization=0):
+        output_data = {i: None for i in range(epochs)}
+        
         total_inputs = len(training_data)
         
         if test_data is not None:
@@ -126,7 +169,7 @@ class NeuralNetwork(object):
             total_cost = 0
             mini_batches = make_mini_batches(training_data, mini_batch_size)
 
-            for mini_batch_index, mini_batch in enumerate(mini_batches):
+            for mini_batch in mini_batches:
                 delta_gradient_w = [np.zeros(layer.weights.shape) for layer in self.layers]
                 delta_gradient_b = [np.zeros(layer.biases.shape) for layer in self.layers]
 
@@ -135,20 +178,17 @@ class NeuralNetwork(object):
 
                 total_cost += cost
 
-                ### Testing after each batch
-                if test_data is not None and epochs == 1:
-                    print(f"{mini_batch_index+1}th mini-batch completed ({(mini_batch_index + 1)*mini_batch_size}/{total_inputs})")
-                    correct, total, wrong_cases = self.test_network(test_data, tests)
-                    print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
-
                 self.apply_gradients(delta_gradient_w, delta_gradient_b, learning_rate/mini_batch_size)
             
+            average_training_cost = total_cost / total_inputs
             # Testing after each epoch
-            if test_data is not None and epochs != 1:
+            if test_data is not None:
                 print(f"{epoch_num+1}th epoch completed ({(epoch_num + 1)}/{epochs})")
-                print(f"Average cost: {total_cost / len(training_data)}")
+                print(f"Average cost: {average_training_cost}")
                 correct, total, wrong_cases = self.test_network(test_data, tests)
                 print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
+
+                output_data[epoch_num] = (average_training_cost, correct, total, wrong_cases)
 
     def update_gradients(self, dp_input, expected_output, gradient_w, gradient_b):
         """
@@ -265,46 +305,6 @@ class Layer:
     def __repr__(self) -> str:
         return_string = f"Weights: {self.weights}, biases: {self.biases}"
         return return_string
-
-def activation_function(weighted_inputs):
-    ## Sigmoid function
-    outputs = expit(weighted_inputs)
-    return outputs
-
-
-def activation_derivative(weighted_inputs):
-    ## Derivative of the sigmoid function
-    ###  da
-    ### ----
-    ###  dz
-    activation_values = activation_function(weighted_inputs)
-    return activation_values * (1-activation_values)
-
-
-def make_mini_batches(data, mini_batch_size):
-    np.random.shuffle(data)
-    mini_batches = [data[index:index+mini_batch_size] for index in range(0, len(data), mini_batch_size)]
-    return mini_batches
-
-
-def classify_output(real_outputs, desired_output, certainty=0):
-    real_result = real_outputs.argmax()
-    if real_result == desired_output and max(real_outputs) > certainty:
-        return True
-    return False
-
-
-def load_network(file_name):
-    with open(file_name, "r") as file:
-        data = json.load(file)
-    cost_function = getattr(sys.modules[__name__], data["cost"])
-    cost = cost_function()
-    layers = []
-    for layer_weights, layer_biases in zip(data["weights"], data["biases"]):
-        new_layer = Layer(layer_weights, layer_biases, cost)
-        layers.append(new_layer)
-    net = NeuralNetwork(sizes=data["sizes"], layers=layers, cost_function=cost)
-    return net
 
 
 if __name__ == "__main__":

@@ -31,9 +31,9 @@ def shuffle_data(data):
     return new_data
 
 
-def vectorize_train_data(train_data):
+def vectorize(data):
     vectorized_train_data = []
-    for input, output_number in train_data:
+    for input, output_number in data:
         new_outputs = np.zeros((10, 1))
         new_outputs[output_number] = 1.0
         vectorized_train_data.append((input, new_outputs))
@@ -47,8 +47,7 @@ def split_validation_train_data(all_train_data, validation_data_num):
     else:
         validation_data = []
         train_data = all_train_data
-    vectorized_train_data = vectorize_train_data(train_data)
-    return vectorized_train_data, validation_data
+    return train_data, validation_data
 
 
 def load_mnist(validation_data_num=10000):
@@ -61,7 +60,7 @@ def load_mnist(validation_data_num=10000):
     all_train_data = load_data(train_images_path, train_labels_path)
     train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
     
-    return (train_data, validation_data, test_data)
+    return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
 
 def load_fashion(validation_data_num=10000):
     test_images_path = "data/fashion/t10k-images-idx3-ubyte.gz"
@@ -73,7 +72,7 @@ def load_fashion(validation_data_num=10000):
     all_train_data = load_data(train_images_path, train_labels_path)
     train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
 
-    return (train_data, validation_data, test_data)
+    return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
 
 
 if __name__ == "__main__":

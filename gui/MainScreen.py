@@ -114,7 +114,7 @@ class MainScreen(tk.Frame):
         self.save_button = tk.Button(bottom_buttons_frame, text='Save Network', font=('arial', 15, 'normal'), command=self.saveNetwork)
         self.save_button.grid(row=0, column=0, sticky="nsew")
         # 'Show graphs' button
-        self.show_graphs_button =  tk.Button(bottom_buttons_frame, text='Show Progress', font=('arial', 15, 'normal'), command=self.show_graphs)
+        self.show_graphs_button =  tk.Button(bottom_buttons_frame, text='Show Progress', font=('arial', 15, 'normal'), command=lambda: self.controller.show_frame("ViewProgress"))
         self.show_graphs_button.grid(row=0, column=1, sticky="nsew")
         # 'Stop training' button
         self.resume_training_button = tk.Button(bottom_buttons_frame, text='No Network', font=('arial', 15, 'normal'), command=self.controller.continue_training)
@@ -129,7 +129,7 @@ class MainScreen(tk.Frame):
         self.draw_button = tk.Button(bottom_buttons_frame, text='Test own drawings', font=('arial', 15, 'normal'), command=lambda: self.controller.show_frame("CanvasDrawing"))
         self.draw_button.grid(row=0, column=5, sticky="nsew")
 
-        self.update_buttons(network_created=False, network_running=False)
+        self.update_elements()
 
     def activate_button(self, button, activation_val=True):
         if activation_val:
@@ -138,7 +138,11 @@ class MainScreen(tk.Frame):
             state = "disabled"
         button["state"] = state
 
-    def update_buttons(self, network_created=False, network_running=False, epochs_to_run=0):
+    def update_elements(self):
+        network_created = self.controller.network_created
+        network_running = self.controller.training_running
+        epochs_to_run = self.controller.epochs_to_run
+
         network_needed_buttons = (self.save_button, self.train_button, self.draw_button, self.browse_outputs_button)
 
         for button in network_needed_buttons:
@@ -189,7 +193,7 @@ class MainScreen(tk.Frame):
         regularization = int(self.regularization_box.get())
         epochs = int(self.epoch_box.get())
         stop_after_epoch = self.stop_after_epoch_var.get()
-        self.controller.train_network(dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch)
+        self.controller.initialize_training(dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch)
 
 
     def saveNetwork(self):
@@ -201,12 +205,6 @@ class MainScreen(tk.Frame):
             print(f"Network saved to file {file_name}")
 
     def browse_outputs(self):
-        print('clicked')
-
-    def show_graphs(self):
-        print('clicked')
-
-    def test_own_drawing(self):
         print('clicked')
 
 

@@ -1,3 +1,4 @@
+from concurrent.futures import process
 import math
 import sys
 import numpy as np
@@ -77,6 +78,8 @@ def make_mini_batches(data, mini_batch_size):
 
 
 def classify_output(real_outputs, desired_output, certainty=0):
+    if not np.isscalar(desired_output):
+        desired_output = desired_output.argmax()
     real_result = real_outputs.argmax()
     if real_result == desired_output and max(real_outputs) > certainty:
         return True
@@ -100,6 +103,12 @@ class NeuralNetwork(object):
     def __init__(self, sizes=None, layers=None, cost_function=CrossEntropyCost(), activation_function=activation_function) -> None:
         self.cost_function = cost_function
         self.sizes = sizes
+
+        self.last_training_cost = 0
+        self.last_training_accuracy = 0
+        self.last_test_outputs = {}
+        self.last_test_cost = 0
+        self.last_test_accuracy = 0
 
         if layers is not None:
             self.layers = layers
@@ -134,7 +143,8 @@ class NeuralNetwork(object):
         with open(file_name, "w") as file:
             json.dump(data, file)
 
-    def test_network(self, test_data, num_of_datapoints=None):
+    def test_network(self, test_data, num_of_datapoints=None, monitor_cost=False):
+        test_cost = 0
         np.random.shuffle(test_data)
         if num_of_datapoints is None:
             num_of_datapoints = len(test_data)
@@ -142,32 +152,28 @@ class NeuralNetwork(object):
         test_data = test_data[:num_of_datapoints]
         
         correct_answers_num = 0
-        wrong_answers = []
+        answers = []
         for data_point in test_data:
             inputs = data_point[0]
             desired_outputs = data_point[1]
             real_outputs = self.process_input(inputs)
 
             answer = classify_output(real_outputs, desired_outputs, certainty=0)
-            if answer:
-                correct_answers_num += 1
-            else:
-                wrong_answers.append((inputs, desired_outputs, real_outputs))
-        return correct_answers_num, num_of_datapoints, wrong_answers
+            correct_answers_num += int(answer)
+            answers.append((inputs, desired_outputs, real_outputs))
 
-    def train_network(self, training_data, mini_batch_size=10, learning_rate=0.05, test_data=None, tests=None, epochs=1, regularization=0):
-        output_data = {i: None for i in range(epochs)}
-        
+            if monitor_cost:
+                test_cost += self.cost_function.calculate_cost(real_outputs, desired_outputs)
+        return correct_answers_num, num_of_datapoints, test_cost/num_of_datapoints, answers
+
+    def train_network(self, training_data, mini_batch_size=10, learning_rate=0.05, test_data=None, tests=None, epochs=1, regularization=0, monitor_accuracy=False):
         total_inputs = len(training_data)
-        
-        if test_data is not None:
-            print(f"Initial test")
-            correct, total, wrong_cases = self.test_network(test_data, tests)
-            print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
-
+        total_correct = 0
+        total_cost = 0
         for epoch_num in range(epochs):
-            total_cost = 0
+            epoch_cost = 0
             mini_batches = make_mini_batches(training_data, mini_batch_size)
+            epoch_correct_answers = 0
 
             for mini_batch in mini_batches:
                 delta_gradient_w = [np.zeros(layer.weights.shape) for layer in self.layers]
@@ -175,20 +181,25 @@ class NeuralNetwork(object):
 
                 for datapoint_input, datapoint_output in mini_batch:
                     delta_gradient_w, delta_gradient_b, cost = self.update_gradients(datapoint_input, datapoint_output, delta_gradient_w, delta_gradient_b)
-
-                total_cost += cost
+                    
+                    if monitor_accuracy:
+                        activations = self.process_input(datapoint_input)
+                        epoch_correct_answers += int(classify_output(activations, datapoint_output))
 
                 self.apply_gradients(delta_gradient_w, delta_gradient_b, learning_rate/mini_batch_size)
-            
-            average_training_cost = total_cost / total_inputs
+                epoch_cost += cost
+
+            total_cost += epoch_cost
+            total_correct += epoch_correct_answers
             # Testing after each epoch
             if test_data is not None:
                 print(f"{epoch_num+1}th epoch completed ({(epoch_num + 1)}/{epochs})")
-                print(f"Average cost: {average_training_cost}")
-                correct, total, wrong_cases = self.test_network(test_data, tests)
+                print(f"Average epoch cost: {epoch_cost/total_inputs}")
+                correct, total, _, _ = self.test_network(test_data, tests)
                 print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
-
-                output_data[epoch_num] = (average_training_cost, correct, total, wrong_cases)
+        
+        self.last_training_cost = total_cost / (epochs * total_inputs)
+        self.last_training_accuracy = total_correct / (epochs * total_inputs)
 
     def update_gradients(self, dp_input, expected_output, gradient_w, gradient_b):
         """
@@ -235,6 +246,18 @@ class NeuralNetwork(object):
         for layer in self.layers:
             current_activations = layer.calculate_outputs(current_activations)
         return current_activations
+    
+    def softmax_output(self, input_object):
+        activations = self.process_input(input_object)
+        e_to_activations = np.power(math.e, activations)
+        softmax_activations = e_to_activations / sum(e_to_activations) 
+        return softmax_activations
+
+    def output_probabilities(self, input_object):
+        activations = self.process_input(input_object)
+        softmax_activations = activations / sum(activations) 
+        return softmax_activations
+
 
 class Layer:
     def __init__(self, weights, biases, cost_function) -> None:
@@ -254,7 +277,6 @@ class Layer:
 
     def calculate_outputs(self, previous_activations):
         ## Calculate weighted inputs of this layer (dot product of weights, previous activations + bias)
-        
         layer_weighted_inputs = np.dot(self.weights, previous_activations) + self.biases
         layer_activations = activation_function(layer_weighted_inputs)
         self.weighted_inputs = layer_weighted_inputs

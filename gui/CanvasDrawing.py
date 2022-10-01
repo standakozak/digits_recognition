@@ -89,3 +89,11 @@ class CanvasDrawing(tkinter.Frame):
 
     def update_elements(self):
         pass
+
+
+if __name__ == "__main__":
+    from drawing_gui import NeuralNetworksGUI
+
+    main_app = NeuralNetworksGUI()
+    #main_app.show_frame("CanvasDrawing")
+    main_app.mainloop()

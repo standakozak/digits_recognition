@@ -71,9 +71,11 @@ class MainScreen(tk.Frame):
 
         ## Top buttons frame
         # 'Load' button
-        tk.Button(top_buttons_frame, text='Load from file', font=('arial', 15, 'normal'), command=self.load_network).grid(row=0, column=0)
+        self.load_button = tk.Button(top_buttons_frame, text='Load from file', font=('arial', 15, 'normal'), command=self.load_network)
+        self.load_button.grid(row=0, column=0)
         # 'Create' button
-        tk.Button(top_buttons_frame, text='Create Network', font=('arial', 15, 'normal'), command=self.create_network).grid(row=0, column=1)
+        self.create_network_button = tk.Button(top_buttons_frame, text='Create Network', font=('arial', 15, 'normal'), command=self.create_network)
+        self.create_network_button.grid(row=0, column=1)
         
         ## Bottom inputs frame
         # Dataset choice
@@ -101,13 +103,20 @@ class MainScreen(tk.Frame):
 
         # Number of epochs spinbox
         tk.Label(bottom_inputs_frame, text='Epochs:', font=('arial', 12, 'normal')).grid(row=4, column=0, sticky="e")
-        self.epoch_box = tk.Spinbox(bottom_inputs_frame, from_=1, to=1000, font=('arial', 12, 'normal'), bg = '#FFFFFF', width=10)
+        self.epoch_box = tk.Spinbox(
+            bottom_inputs_frame, from_=1, to=1000, font=('arial', 12, 'normal'), bg = '#FFFFFF', width=10, textvariable=tk.StringVar(self, value="5")
+        )
         self.epoch_box.grid(row=4, column=1, sticky="w")
 
         # Stop after epoch checkbox
         self.stop_after_epoch_var = tk.IntVar()
         self.stop_after_epoch_box = tk.Checkbutton(bottom_inputs_frame, text='Stop after each epoch:', variable=self.stop_after_epoch_var, font=('arial', 12, 'normal'))
         self.stop_after_epoch_box.grid(row=5, column=0, columnspan=2, sticky="nsew", padx=50)
+
+        # Number of tests after each epoch
+        tk.Label(bottom_inputs_frame, text='Tests after each epoch', font=('arial', 12, 'normal')).grid(row=6, column=0, sticky="e")
+        self.tests_num_box = tk.Spinbox(bottom_inputs_frame, from_=1, to=10000, font=('arial', 12, 'normal'), bg = '#FFFFFF', width=10, textvariable=tk.StringVar(self, value="10000"))
+        self.tests_num_box.grid(row=6, column=1, sticky="w")
 
         ## Bottom buttons frame
         # 'Save' button
@@ -139,28 +148,38 @@ class MainScreen(tk.Frame):
         button["state"] = state
 
     def update_elements(self):
-        network_created = self.controller.network_created
-        network_running = self.controller.training_running
-        epochs_to_run = self.controller.epochs_to_run
-
-        network_needed_buttons = (self.save_button, self.train_button, self.draw_button, self.browse_outputs_button)
+        network_needed_buttons = (self.save_button, self.draw_button, self.browse_outputs_button)
 
         for button in network_needed_buttons:
             ## Activate 'Save', 'Train', 'Browse outputs', 'Test own drawings' buttons if network is exists, but is not running
-            self.activate_button(button, all((network_created, not network_running)))
+            self.activate_button(button, all((self.controller.network_created, not self.controller.training_running)))
 
-        self.activate_button(self.show_graphs_button, network_created)
+        self.activate_button(self.create_network_button, not self.controller.training_running)
+        self.activate_button(self.load_button, not self.controller.training_running)
+        self.activate_button(self.show_graphs_button, self.controller.network_created)
+        self.update_resume_button()
+        self.update_train_button()
 
+    def update_train_button(self):
+        self.activate_button(self.train_button, self.controller.network_created)
+        if self.controller.training_running or self.controller.epochs_to_run > 0:
+            self.train_button["text"] = "Stop Training"
+            self.train_button["command"] = self.stop_training
+        else:
+            self.train_button["text"] = "Train Network"
+            self.train_button["command"] = self.trainNetwork
+
+    def update_resume_button(self):
         # Activate 'Resume' button if network is not running but still has epochs in queue
-        self.activate_button(self.resume_training_button, all((not network_running, (epochs_to_run > 0))))
+        self.activate_button(self.resume_training_button, all((not self.controller.training_running, (self.controller.epochs_to_run > 0))))
 
-        if epochs_to_run > 0:
-            self.resume_training_button["text"] = f"Continue ({epochs_to_run} more epochs)"
+        if self.controller.epochs_to_run > 0:
+            self.resume_training_button["text"] = f"Continue ({self.controller.epochs_to_run} more epochs)"
         else:
             self.resume_training_button["text"] = f"Network idle"
-        if network_running:
-            self.resume_training_button["text"] = f"Network running ({epochs_to_run} more epochs)"
-        if not network_created:
+        if self.controller.training_running:
+            self.resume_training_button["text"] = f"Network running ({self.controller.epochs_to_run} more epochs)"
+        if not self.controller.network_created:
             self.resume_training_button["text"] = f"No Network"
 
     def create_network(self):
@@ -193,8 +212,15 @@ class MainScreen(tk.Frame):
         regularization = int(self.regularization_box.get())
         epochs = int(self.epoch_box.get())
         stop_after_epoch = self.stop_after_epoch_var.get()
-        self.controller.initialize_training(dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch)
+        tests_after_epoch = int(self.tests_num_box.get())
+        self.controller.initialize_training(dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch, tests_after_epoch)
 
+    def stop_training(self):
+        update_elements_after_click = not self.controller.training_running  # If the button was clicked during pause -> update buttons immediatelly
+        self.controller.stop_training()
+        self.activate_button(self.train_button, False)
+        if update_elements_after_click:
+            self.update_elements()
 
     def saveNetwork(self):
         if self.controller.network is not None:
@@ -209,10 +235,8 @@ class MainScreen(tk.Frame):
 
 
 if __name__ == "__main__":
-    app = tk.Tk()
+    from drawing_gui import NeuralNetworksGUI
 
-    app.geometry('890x590')
-    app.configure(background='#FFFFFF')
-
-    main_screen = MainScreen(app, "")
-    app.mainloop()
+    main_app = NeuralNetworksGUI()
+    main_app.show_frame("MainScreen")
+    main_app.mainloop()

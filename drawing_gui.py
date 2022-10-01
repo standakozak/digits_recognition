@@ -23,7 +23,9 @@ class NeuralNetworksGUI(tk.Tk):
         self.mini_batch_size = None
         self.learning_rate = None
         self.regularization = None
+        self.num_of_tests = None
         self.epochs_to_run = 0
+        self.total_training_epochs = 0
 
         self.last_test_answers = []
         self.last_test_accuracies = []
@@ -69,7 +71,7 @@ class NeuralNetworksGUI(tk.Tk):
             print(f"{index}: {round(float(certainty), 3)} %")
     
     def test_network(self):
-        correct, total_inputs, test_cost, self.last_test_answers = self.network.test_network(self.test_data, monitor_cost=True)
+        correct, total_inputs, test_cost, self.last_test_answers = self.network.test_network(self.test_data, num_of_datapoints=self.num_of_tests, monitor_cost=True)
         self.last_test_accuracies.append(correct / total_inputs)
         self.last_test_costs.append(test_cost)
         print(f"Test: ({correct} / {total_inputs})   {(correct * 100) / total_inputs} %")
@@ -79,7 +81,7 @@ class NeuralNetworksGUI(tk.Tk):
         while self.training_running:
             self.network.train_network(
                 self.training_data, mini_batch_size=self.mini_batch_size, learning_rate=self.learning_rate, 
-                test_data=None, tests=10000, epochs=1, regularization=self.regularization, monitor_accuracy=True
+                test_data=None, tests=0, epochs=1, regularization=self.regularization, monitor_accuracy=True
             )
             self.last_training_accuracies.append(self.network.last_training_accuracy)
             self.last_training_costs.append(self.network.last_training_cost)
@@ -101,20 +103,25 @@ class NeuralNetworksGUI(tk.Tk):
         print(f"Initial test")
         self.test_network()
         self.train_network(stop=stop)
+    
+    def stop_training(self):
+        self.training_running = False
+        self.epochs_to_run = 0
 
-
-    def initialize_training(self, dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop):
+    def initialize_training(self, dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop, num_of_tests):
         self.last_test_accuracies = []
         self.last_test_costs = []
-        self.last_training_accuracies = []
-        self.last_training_costs = []
+        self.last_training_accuracies = [None]
+        self.last_training_costs = [None]
         
         self.training_data, self.validation_data, self.test_data = dataset_function()
         self.mini_batch_size = mini_batch_size
         self.learning_rate = learning_rate
         self.regularization = regularization
+        self.num_of_tests = num_of_tests
 
         self.epochs_to_run = epochs
+        self.total_training_epochs = epochs
         threading.Thread(target=lambda: self.start_training(stop)).start()
 
                 

@@ -83,13 +83,7 @@ class ViewProgress(tk.Frame):
         self.axes.legend()
 
         self.axes.set_xlim(left=0, right=total_points-1)
-        #x_labels = ["Initial test"] + list(range(1, total_points))
-        #self.axes.set_xticks(x_axis, x_labels)
-        # if self.showing_accuracy:
-        #     self.axes.set_yticks(range(0, 101, 10))
 
-        print(f"Last test data: {data[0]}")
-        print(f"Last training data: {data[1]}")
         self.plot_canvas.draw()
 
     def activate_button(self, button, activation_val=True):

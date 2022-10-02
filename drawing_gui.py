@@ -1,22 +1,39 @@
 import tkinter as tk
+
 from gui.CanvasDrawing import CanvasDrawing
 from gui.MainScreen import MainScreen
 from gui.ViewProgress import ViewProgress
-from networks.neural_network_2 import NeuralNetwork, activation_function, MeanSquaredErrorCost, CrossEntropyCost
+from gui.BrowseOutputs import BrowseOutputs
+from networks.neural_network_2 import NeuralNetwork, activation_function, MeanSquaredErrorCost, CrossEntropyCost, get_desired_output
+from mnist_loader import load_mnist, load_fashion
 
 import threading
 
 
 class NeuralNetworksGUI(tk.Tk):
-    FRAMES = (MainScreen, CanvasDrawing, ViewProgress)
+    FRAMES = (MainScreen, CanvasDrawing, ViewProgress, BrowseOutputs)
     IMAGE_RESOLUTION = 28
+    datasets = {
+        "MNIST": (
+            load_mnist, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        ),
+        "Fashion": (
+            load_fashion, ["T-Shirt", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
+        ),
+        "Doodles": (
+            load_mnist, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+        )
+    }
 
     def __init__(self) -> None:
         super().__init__()
+
+        # For MainScreen - setting up the network
         self.network = None
         self.network_created = False
         self.training_running = False
 
+        # For MainScreen - training the network
         self.training_data = None
         self.validation_data = None
         self.test_data = None
@@ -27,7 +44,13 @@ class NeuralNetworksGUI(tk.Tk):
         self.epochs_to_run = 0
         self.total_training_epochs = 0
 
+        self.dataset = self.datasets["MNIST"]
+        
+        # For BrowseOutputs
         self.last_test_answers = []
+        self.current_output_index = -1
+        
+        # For ViewProgress
         self.last_test_accuracies = []
         self.last_test_costs = []
         self.last_training_accuracies = []
@@ -57,25 +80,60 @@ class NeuralNetworksGUI(tk.Tk):
         self.current_frame.update_elements()
         self.current_frame.tkraise()
 
+    ## BrowseOutputs Frame
+    def show_next_test_output(self, incorrect=False):
+        if not self.last_test_answers:
+            return
+        
+        image = None
+        image_found = False
+        image_index = self.current_output_index
+        while not image_found:
+            image_index += 1
+            
+            if image_index >= len(self.last_test_answers):
+                image_index = 0
+                if self.current_output_index == -1:
+                    image_found = True
+            
+            image = self.last_test_answers[image_index]
+            if image[3] == False or not incorrect or image_index == self.current_output_index:
+                image_found = True
+                self.current_output_index = image_index
+        
+        inputs = image[0].reshape((self.IMAGE_RESOLUTION, self.IMAGE_RESOLUTION))
+        correct_answer = self.dataset[1][get_desired_output(image[1])]
+        real_answers = self.match_probabilities_with_answers(image[2])
+
+        self.current_frame.show_output(inputs, correct_answer, real_answers, image[3])
+
+    ## CanvasDrawing Frame
+    def test_drawn_image(self, input_object):
+        input_resized = input_object.reshape((self.IMAGE_RESOLUTION ** 2, 1))
+        probabilities = self.network.output_probabilities(input_resized)
+
+        zipped_sorted = self.match_probabilities_with_answers(probabilities)
+        if self.current_frame.__class__.__name__ == "CanvasDrawing":
+            self.current_frame.display_probabilities(zipped_sorted)
+
+    def match_probabilities_with_answers(self, activations):
+        answers = self.dataset[1]
+        zipped = list(zip(answers, activations * 100))
+        sorted_answers_probabilities = sorted(zipped, key=lambda x: x[1], reverse=True)
+        return sorted_answers_probabilities
+        
+    ## MainScreen Frame
     def update_network(self, net):
         self.network = net
         self.network_created = True
         self.current_frame.update_elements()
 
-    def test_drawn_image(self, input_object):
-        input_resized = input_object.reshape((self.IMAGE_RESOLUTION ** 2, 1))
-        probabilities = self.network.output_probabilities(input_resized) * 100
-
-        print("Guessing drawn image:")
-        for index, certainty in enumerate(probabilities):
-            print(f"{index}: {round(float(certainty), 3)} %")
-    
     def test_network(self):
         correct, total_inputs, test_cost, self.last_test_answers = self.network.test_network(self.test_data, num_of_datapoints=self.num_of_tests, monitor_cost=True)
         self.last_test_accuracies.append(correct / total_inputs)
         self.last_test_costs.append(test_cost)
         print(f"Test: ({correct} / {total_inputs})   {(correct * 100) / total_inputs} %")
-
+    
     def train_network(self, stop):
         self.set_training_running(True)
         while self.training_running:
@@ -108,13 +166,14 @@ class NeuralNetworksGUI(tk.Tk):
         self.training_running = False
         self.epochs_to_run = 0
 
-    def initialize_training(self, dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop, num_of_tests):
+    def initialize_training(self, dataset, mini_batch_size, learning_rate, regularization, epochs, stop, num_of_tests):
+        self.dataset = self.datasets[dataset]
         self.last_test_accuracies = []
         self.last_test_costs = []
         self.last_training_accuracies = [None]
         self.last_training_costs = [None]
         
-        self.training_data, self.validation_data, self.test_data = dataset_function()
+        self.training_data, self.validation_data, self.test_data = self.dataset[0]()
         self.mini_batch_size = mini_batch_size
         self.learning_rate = learning_rate
         self.regularization = regularization

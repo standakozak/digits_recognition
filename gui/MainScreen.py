@@ -132,7 +132,7 @@ class MainScreen(tk.Frame):
         self.train_button = tk.Button(bottom_buttons_frame, text='Start training', font=('arial', 15, 'normal'), command=self.trainNetwork)
         self.train_button.grid(row=0, column=3, sticky="nsew")
         # 'Browse outputs' button
-        self.browse_outputs_button = tk.Button(bottom_buttons_frame, text='Browse Outputs', font=('arial', 15, 'normal'), command=self.browse_outputs)
+        self.browse_outputs_button = tk.Button(bottom_buttons_frame, text='Browse Outputs', font=('arial', 15, 'normal'), command=lambda: self.controller.show_frame("BrowseOutputs"))
         self.browse_outputs_button.grid(row=0, column=4, sticky="nsew")
         # 'Test own drawings' button
         self.draw_button = tk.Button(bottom_buttons_frame, text='Test own drawings', font=('arial', 15, 'normal'), command=lambda: self.controller.show_frame("CanvasDrawing"))
@@ -206,14 +206,14 @@ class MainScreen(tk.Frame):
             self.controller.update_network(net)
 
     def trainNetwork(self):
-        dataset_function = self.dataset_functions[self.dataset_box.get()]
+        dataset = self.dataset_box.get()
         mini_batch_size = int(self.mini_batch_size_box.get())
         learning_rate = float(self.learning_rate_box.get())
         regularization = int(self.regularization_box.get())
         epochs = int(self.epoch_box.get())
         stop_after_epoch = self.stop_after_epoch_var.get()
         tests_after_epoch = int(self.tests_num_box.get())
-        self.controller.initialize_training(dataset_function, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch, tests_after_epoch)
+        self.controller.initialize_training(dataset, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch, tests_after_epoch)
 
     def stop_training(self):
         update_elements_after_click = not self.controller.training_running  # If the button was clicked during pause -> update buttons immediatelly
@@ -238,5 +238,4 @@ if __name__ == "__main__":
     from drawing_gui import NeuralNetworksGUI
 
     main_app = NeuralNetworksGUI()
-    main_app.show_frame("MainScreen")
     main_app.mainloop()

@@ -77,9 +77,14 @@ def make_mini_batches(data, mini_batch_size):
     return mini_batches
 
 
+def get_desired_output(outputs):
+    if not np.isscalar(outputs):
+        return outputs.argmax()
+    return outputs
+
+
 def classify_output(real_outputs, desired_output, certainty=0):
-    if not np.isscalar(desired_output):
-        desired_output = desired_output.argmax()
+    desired_output = get_desired_output(desired_output)
     real_result = real_outputs.argmax()
     if real_result == desired_output and max(real_outputs) > certainty:
         return True
@@ -160,7 +165,7 @@ class NeuralNetwork(object):
 
             answer = classify_output(real_outputs, desired_outputs, certainty=0)
             correct_answers_num += int(answer)
-            answers.append((inputs, desired_outputs, real_outputs))
+            answers.append((inputs, desired_outputs, real_outputs/sum(real_outputs), answer))
 
             if monitor_cost:
                 test_cost += self.cost_function.calculate_cost(real_outputs, desired_outputs)
@@ -255,8 +260,8 @@ class NeuralNetwork(object):
 
     def output_probabilities(self, input_object):
         activations = self.process_input(input_object)
-        softmax_activations = activations / sum(activations) 
-        return softmax_activations
+        probabilities = activations / sum(activations) 
+        return probabilities
 
 
 class Layer:

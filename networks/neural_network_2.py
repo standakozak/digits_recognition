@@ -1,8 +1,7 @@
-from concurrent.futures import process
 import math
 import sys
 import numpy as np
-import book_code.mnist_loader as mnist_loader
+from mnist_loader import load_mnist
 from scipy.special import expit
 
 import json
@@ -77,14 +76,14 @@ def make_mini_batches(data, mini_batch_size):
     return mini_batches
 
 
-def get_desired_output(outputs):
+def unvectorize_output(outputs):
     if not np.isscalar(outputs):
         return outputs.argmax()
     return outputs
 
 
 def classify_output(real_outputs, desired_output, certainty=0):
-    desired_output = get_desired_output(desired_output)
+    desired_output = unvectorize_output(desired_output)
     real_result = real_outputs.argmax()
     if real_result == desired_output and max(real_outputs) > certainty:
         return True
@@ -213,7 +212,7 @@ class NeuralNetwork(object):
         one_input_cost = self.calculate_cost_of_one_input(dp_input, expected_output)
 
         old_layer = None
-        ## next layer = layer[i+1]; previous layer = layer[i-1]
+        ## next layer: layers[i+1]; previous layer: layers[i-1]
         for layer_index, layer in reversed(list(enumerate(self.layers))):
             if layer_index > 0:
                 previous_activations = self.layers[layer_index-1].activations
@@ -336,5 +335,5 @@ class Layer:
 
 if __name__ == "__main__":
     digits_network = NeuralNetwork([784, 30, 10], cost_function=CrossEntropyCost())
-    training_data, validation_data, test_data = mnist_loader.load_data_wrapper()
+    training_data, validation_data, test_data = load_mnist()
     digits_network.train_network(training_data, mini_batch_size=10, learning_rate=0.5, test_data=test_data, tests=10000, epochs=10)

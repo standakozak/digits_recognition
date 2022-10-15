@@ -66,25 +66,27 @@ class ViewProgress(tk.Frame):
         else:
             title = "Cost"
             data = [self.controller.last_test_costs, self.controller.last_training_costs]
-        total_points = self.controller.total_training_epochs + 1
-        data[0] = data[0] + [None for _ in range(total_points - len(data[0]))]
-        data[1] = data[1] + [None for _ in range(total_points - len(data[1]))]
-        x_axis = range(total_points)
 
-        # Figure setup and plotting
-        self.axes.clear()
-        self.axes.set_title(f"Training and Test {title}")
-        self.axes.set_xlabel("Epoch")
-        self.axes.set_ylabel(title)
+        if data[0]:
+            total_points = self.controller.total_training_epochs + 1
+            data[0] = data[0] + [None for _ in range(total_points - len(data[0]))]
+            data[1] = data[1] + [None for _ in range(total_points - len(data[1]))]
+            x_axis = range(total_points)
 
-        self.axes.plot(x_axis, data[0], linestyle="-", marker="o", color="green", label="Test " + title.replace(" (%)", ""))
-        self.axes.plot(x_axis, data[1], linestyle="-", marker="o", color="blue", label="Training " + title.replace(" (%)", ""))
-        self.axes.grid(True)
-        self.axes.legend()
+            # Figure setup and plotting
+            self.axes.clear()
+            self.axes.set_title(f"Training and Test {title}")
+            self.axes.set_xlabel("Epoch")
+            self.axes.set_ylabel(title)
 
-        self.axes.set_xlim(left=0, right=total_points-1)
+            self.axes.plot(x_axis, data[0], linestyle="-", marker="o", color="green", label="Test " + title.replace(" (%)", ""))
+            self.axes.plot(x_axis, data[1], linestyle="-", marker="o", color="blue", label="Training " + title.replace(" (%)", ""))
+            self.axes.grid(True)
+            self.axes.legend()
 
-        self.plot_canvas.draw()
+            self.axes.set_xlim(left=0, right=total_points-1)
+
+            self.plot_canvas.draw()
 
     def activate_button(self, button, activation_val=True):
         if activation_val:
@@ -95,7 +97,7 @@ class ViewProgress(tk.Frame):
 
 
 if __name__ == "__main__":
-    from drawing_gui import NeuralNetworksGUI
+    from main import NeuralNetworksGUI
 
     main_app = NeuralNetworksGUI()
     #main_app.show_frame("ViewProgress")

@@ -4,11 +4,12 @@ from gui.CanvasDrawing import CanvasDrawing
 from gui.MainScreen import MainScreen
 from gui.ViewProgress import ViewProgress
 from gui.BrowseOutputs import BrowseOutputs
-from networks.neural_network_2 import NeuralNetwork, activation_function, MeanSquaredErrorCost, CrossEntropyCost, get_desired_output
-from mnist_loader import load_mnist, load_fashion
+from networks.neural_network_2 import NeuralNetwork, activation_function, MeanSquaredErrorCost, CrossEntropyCost, unvectorize_output
+from mnist_loader import load_mnist, load_fashion, load_doodles
 
 import threading
 
+DOODLE_CATEGORIES = ["axe", "bicycle", "broom", "bucket", "candle", "chair", "eyeglasses", "guitar", "key", "ladder"]
 
 class NeuralNetworksGUI(tk.Tk):
     FRAMES = (MainScreen, CanvasDrawing, ViewProgress, BrowseOutputs)
@@ -21,7 +22,7 @@ class NeuralNetworksGUI(tk.Tk):
             load_fashion, ["T-Shirt", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
         ),
         "Doodles": (
-            load_mnist, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+            lambda: load_doodles(DOODLE_CATEGORIES), DOODLE_CATEGORIES
         )
     }
 
@@ -102,7 +103,7 @@ class NeuralNetworksGUI(tk.Tk):
                 self.current_output_index = image_index
         
         inputs = image[0].reshape((self.IMAGE_RESOLUTION, self.IMAGE_RESOLUTION))
-        correct_answer = self.dataset[1][get_desired_output(image[1])]
+        correct_answer = self.dataset[1][unvectorize_output(image[1])]
         real_answers = self.match_probabilities_with_answers(image[2])
 
         self.current_frame.show_output(inputs, correct_answer, real_answers, image[3])

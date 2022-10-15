@@ -2,7 +2,9 @@ import gzip
 import numpy as np
 import matplotlib.pyplot as plt
 
+import quickdraw
 import os
+import json
 
 
 def load_images(rel_path, length, resolution=28, img_offset=16):
@@ -23,12 +25,6 @@ def load_data(img_path, lab_path, resolution=28, img_offset=16, lab_offset=8):
     labels = load_labels(lab_path, lab_offset)
     images = load_images(img_path, length=len(labels), resolution=resolution, img_offset=img_offset)
     return list(zip(images, labels))
-
-
-def shuffle_data(data):
-    new_data = data.copy()
-    np.random.shuffle(new_data)
-    return new_data
 
 
 def vectorize(data):
@@ -74,13 +70,93 @@ def load_fashion(validation_data_num=10000):
 
     return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
 
+def shuffle_data(data):
+    new_data = data.copy()
+    np.random.shuffle(new_data)
+    return new_data
+
+def resize_image(image_arr, orig_size=256, desired_size=28):
+    step = int(orig_size / desired_size)
+    resized = []
+    for row_index in range(desired_size):
+        row = row_index * step
+        for col_index in range(desired_size):
+            col = col_index*step
+            resized.append((image_arr[row:row+step, col:col+step]).mean())
+
+    resized_arr = np.asarray(resized)
+    return resized_arr
+
+def check_saved(category):
+    file_name = f"data/quick_draw/{category}.json"
+    return os.path.exists(file_name)
+
+def load_doodles_from_file(category, category_number):
+    file_name = f"data/quick_draw/{category}.json"
+    with open(file_name, "r") as file:
+        data = json.load(file)
+    data_to_return = [(np.asarray(image).reshape(784, 1), category_number) for image in data]
+
+    return data_to_return
+
+def save_doodles_category(data, category):
+    file_name = f"data/quick_draw/{category}.json"
+    data_to_save = [image[0].tolist() for image in data]
+    with open(file_name, "w") as file:
+        json.dump(data_to_save, file)
+
+def load_doodle_category(category, num_of_drawings, category_number):
+    data = []
+    data_group = quickdraw.QuickDrawDataGroup(category, recognized=True, max_drawings=num_of_drawings)
+    for quick_draw_image in data_group.drawings:
+        image_arr = 1 - (np.asarray(quick_draw_image.image).mean(axis=2) / 255)
+
+        resized = resize_image(image_arr, 256, 28)
+        data.append((resized.reshape(784, 1), category_number))
+    save_doodles_category(data, category)
+    return data
+
+def load_doodles(categories_list=None):
+    total_data_length = 70_000
+    totaL_test_length = 10_000
+    total_validation_length = 10_000
+    
+    if categories_list is None:
+        categories = [
+            "axe", "bicycle", "broom", "bucket", "candle", "chair", "eyeglasses", "guitar", "key", "ladder"
+        ]
+    else:
+        categories = categories_list.copy()
+
+    num_of_each_category = total_data_length / len(categories)
+    data = []
+    for category_index, category in enumerate(categories):
+        if check_saved(category):
+            data += load_doodles_from_file(category, category_index)
+        else:
+            data += load_doodle_category(category, num_of_each_category, category_index)
+
+    totaL_train_length = total_data_length - totaL_test_length - total_validation_length
+
+    vectorized = vectorize(shuffle_data(data))
+    train_data = vectorized[:totaL_train_length]
+    test_data = vectorized[totaL_train_length:totaL_train_length+totaL_test_length]
+    validation_data = vectorized[totaL_train_length + totaL_test_length:]
+
+    return (train_data, validation_data, test_data)
+
+
+def show_plot_images(data):
+    image_resolution = 28
+
+    shuffled_data = shuffle_data(data)
+    for image_index in range(0, 9):
+        plt.subplot(330+image_index+1)
+        plt.imshow(shuffled_data[image_index][0].reshape(image_resolution, image_resolution), cmap=plt.get_cmap("gray"))
+    plt.show()
 
 if __name__ == "__main__":
-    image_resolution = 28
-    train_data, validation_data, test_data = load_mnist()
-    shuffled_test = shuffle_data(test_data)
-  
-    for image_index in range(0, 9):
-        plt.subplot(330 + 1 + image_index)
-        plt.imshow(shuffled_test[image_index][0].reshape(image_resolution, image_resolution), cmap=plt.get_cmap("gray"))
-    plt.show()
+    _, _, test_data_doodles = load_doodles()
+    _, _, test_data_mnist = load_mnist()
+    show_plot_images(test_data_doodles)
+    show_plot_images(test_data_mnist)

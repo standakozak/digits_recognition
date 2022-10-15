@@ -1,4 +1,4 @@
-from neural_network_1 import Layer, NeuralNetwork, activation_function, activation_function_from_array
+from networks.neural_network_1 import Layer, NeuralNetwork, activation_function, activation_function_from_array
 
 
 def test_calculate_outputs():

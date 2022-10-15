@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import W, ttk
+from tkinter import ttk
 from networks.neural_network_2 import NeuralNetwork, load_network, CrossEntropyCost, MeanSquaredErrorCost, activation_function
 from mnist_loader import load_mnist, load_fashion
 
@@ -12,8 +12,7 @@ class MainScreen(tk.Frame):
         "Doodles": load_mnist
     }
     activation_functions = {
-        "Sigmoid": activation_function,
-        "Softmax": activation_function
+        "Sigmoid": activation_function
     }
     cost_functions = {
         "Mean Squared Error": MeanSquaredErrorCost,
@@ -59,7 +58,7 @@ class MainScreen(tk.Frame):
         # Activation function choice
         tk.Label(top_inputs_frame, text='Activation function:', font=('arial', 12, 'normal')).grid(row=1, column=0, sticky="e")
 
-        self.activation_func_box = ttk.Combobox(top_inputs_frame, values=["Sigmoid", 'Softmax'], font=('arial', 12, 'normal'), width=12, state="readonly")
+        self.activation_func_box = ttk.Combobox(top_inputs_frame, values=["Sigmoid"], font=('arial', 12, 'normal'), width=12, state="readonly")
         self.activation_func_box.grid(row=1, column=1, sticky="w")
         self.activation_func_box.current(0)
 
@@ -212,7 +211,7 @@ class MainScreen(tk.Frame):
         regularization = int(self.regularization_box.get())
         epochs = int(self.epoch_box.get())
         stop_after_epoch = self.stop_after_epoch_var.get()
-        tests_after_epoch = int(self.tests_num_box.get())
+        tests_after_epoch = max(1, int(self.tests_num_box.get()))
         self.controller.initialize_training(dataset, mini_batch_size, learning_rate, regularization, epochs, stop_after_epoch, tests_after_epoch)
 
     def stop_training(self):
@@ -235,7 +234,7 @@ class MainScreen(tk.Frame):
 
 
 if __name__ == "__main__":
-    from drawing_gui import NeuralNetworksGUI
+    from main import NeuralNetworksGUI
 
     main_app = NeuralNetworksGUI()
     main_app.mainloop()

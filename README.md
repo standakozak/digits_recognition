@@ -3,9 +3,9 @@ This project is a Tkinter GUI for creating and training MLP (Multi-Layer Percept
 
 It enables creating neural networks with custom layer sizes and training it on  Digits MNIST, Fashion MNIST and Quickdraw datasets with basic backpropagation algorithm.
 
-In an interactive interface, it monitors the accuracy and cost throughout multiple training epochs.
+In the Show Progress Screen, it monitors the accuracy and cost throughout multiple training epochs.
 
-You can view the results of the last testing and see, which test cases were problematic. You can also test the network's performance on custom drawings.
+You can view the results of the last testing and see which test cases were problematic by clicking the Browse Outputs button. You can also test the network's performance on custom drawings.
 
 ### Screenshots
 <figure>

@@ -5,7 +5,7 @@ It enables creating neural networks with custom layer sizes and training it on  
 
 In the Show Progress Screen, it monitors the accuracy and cost throughout multiple training epochs.
 
-You can view the results of the last testing and see which test cases were problematic by clicking the Browse Outputs button. You can also test the network's performance on custom drawings.
+You can view the results of the last testing and see which test cases were problematic by clicking the Browse Outputs button. You can also test the network's performance on custom drawings (draw with left mouse button and erase with right button).
 
 ### Screenshots
 <figure>

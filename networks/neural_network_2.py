@@ -1,12 +1,12 @@
+import json
 import math
 import sys
+from abc import ABC, abstractmethod, abstractstaticmethod
+from typing import Optional, Union
+
 import numpy as np
 from mnist_loader import load_mnist
 from scipy.special import expit
-import json
-
-from typing import List, Tuple, Optional, Union
-from abc import ABC, abstractmethod, abstractstaticmethod
 
 
 class ActivationFunction(ABC):
@@ -92,22 +92,7 @@ class MeanSquaredErrorCost(CostFunction):
         return node_values
 
 
-# def activation_function(weighed_inputs:np.ndarray) -> np.ndarray:
-#     ## Sigmoid function
-#     outputs = expit(weighed_inputs)
-#     return outputs
-
-
-# def activation_derivative(weighed_inputs:np.ndarray, activation_func = SigmoidActivationFunction()) -> np.ndarray:
-#     ## Derivative of the sigmoid function
-#     ###  da
-#     ### ----
-#     ###  dz
-#     activation_values = activation_func.activation_function(weighed_inputs)
-#     return activation_values * (1-activation_values)
-
-
-def make_mini_batches(data:List[Tuple[np.ndarray, np.ndarray]], mini_batch_size:int) -> List[List[Tuple[np.ndarray, np.ndarray]]]:
+def make_mini_batches(data:list[tuple[np.ndarray, np.ndarray]], mini_batch_size:int) -> list[list[tuple[np.ndarray, np.ndarray]]]:
     np.random.shuffle(data)
     mini_batches = [data[index:index+mini_batch_size] for index in range(0, len(data), mini_batch_size)]
     return mini_batches
@@ -144,7 +129,7 @@ def load_network(file_name:str):
 
 
 class Layer:
-    def __init__(self, weights:List[List[float]], biases:List[float], cost_function:CostFunction, activation_func:ActivationFunction) -> None:
+    def __init__(self, weights:list[list[float]], biases:list[float], cost_function:CostFunction, activation_func:ActivationFunction) -> None:
         # Sets the layer's weights and biases
         # Parameters: weights: list of lists of ints ([1, 1], [1, 1], [1, 1]) for layer of three nodes and two inputs
         #             (shape = layer nodes(outputs), input_nodes)
@@ -185,7 +170,7 @@ class Layer:
         self.node_values = np.asarray(current_node_values)
 
 
-    def calculate_layer_gradients(self, expected_outputs:np.ndarray, next_layer, previous_activations:np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def calculate_layer_gradients(self, expected_outputs:np.ndarray, next_layer, previous_activations:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         if next_layer == None:
             self.calculate_output_node_values(expected_outputs)
         else:
@@ -212,7 +197,7 @@ class Layer:
 
 
 class NeuralNetwork:
-    def __init__(self, sizes: Optional[List[int]] = None, layers: Optional[List[Layer]] = None, 
+    def __init__(self, sizes: Optional[list[int]] = None, layers: Optional[list[Layer]] = None, 
         cost_function: CostFunction = CrossEntropyCost(), activation_function: ActivationFunction = SigmoidActivationFunction()
     ) -> None:
         self.cost_function = cost_function
@@ -262,8 +247,8 @@ class NeuralNetwork:
             json.dump(data, file)
 
     def test_network(
-        self, test_data: List[Tuple[np.ndarray, np.ndarray]], num_of_datapoints: Optional[int] = None, monitor_cost=False
-    ) -> tuple[int, int, float, List[tuple[np.ndarray, np.ndarray, np.ndarray, bool]]]:
+        self, test_data: list[tuple[np.ndarray, np.ndarray]], num_of_datapoints: Optional[int] = None, monitor_cost=False
+    ) -> tuple[int, int, float, list[tuple[np.ndarray, np.ndarray, np.ndarray, bool]]]:
         
         test_cost = 0.0
         np.random.shuffle(test_data)
@@ -288,8 +273,8 @@ class NeuralNetwork:
         return correct_answers_num, num_of_datapoints, test_cost/num_of_datapoints, answers
 
     def train_network(
-            self, training_data: List[Tuple[np.ndarray, np.ndarray]], mini_batch_size=10, learning_rate=0.05, 
-            test_data: Optional[List[Tuple[np.ndarray, np.ndarray]]] = None, tests: Optional[int] = None,
+            self, training_data: list[tuple[np.ndarray, np.ndarray]], mini_batch_size=10, learning_rate=0.05, 
+            test_data: Optional[list[tuple[np.ndarray, np.ndarray]]] = None, tests: Optional[int] = None,
             epochs=1, regularization=0, monitor_accuracy=False
         ):
         total_inputs = len(training_data)

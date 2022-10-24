@@ -4,7 +4,7 @@ from gui.CanvasDrawing import CanvasDrawing
 from gui.MainScreen import MainScreen
 from gui.ViewProgress import ViewProgress
 from gui.BrowseOutputs import BrowseOutputs
-from networks.neural_network_2 import NeuralNetwork, activation_function, MeanSquaredErrorCost, CrossEntropyCost, unvectorize_output
+from networks.neural_network_2 import NeuralNetwork, SigmoidActivationFunction, MeanSquaredErrorCost, CrossEntropyCost, unvectorize_output
 from mnist_loader import load_mnist, load_fashion, load_doodles
 
 import threading

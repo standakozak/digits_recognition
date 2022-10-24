@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from networks.neural_network_2 import NeuralNetwork, load_network, CrossEntropyCost, MeanSquaredErrorCost, activation_function
+from networks.neural_network_2 import NeuralNetwork, load_network, CrossEntropyCost, MeanSquaredErrorCost, SigmoidActivationFunction
 from mnist_loader import load_mnist, load_fashion
 
 from tkinter import filedialog
@@ -12,7 +12,7 @@ class MainScreen(tk.Frame):
         "Doodles": load_mnist
     }
     activation_functions = {
-        "Sigmoid": activation_function
+        "Sigmoid": SigmoidActivationFunction
     }
     cost_functions = {
         "Mean Squared Error": MeanSquaredErrorCost,
@@ -190,7 +190,7 @@ class MainScreen(tk.Frame):
         print(f"Creating a new neural network with sizes: {self.sizes_input.get()}")
         print(f"Activation function: {self.activation_func_box.get()}")
         print(f"Cost function: {self.cost_func_box.get()}")
-        net = NeuralNetwork(sizes=input_sizes, cost_function=cost_func(), activation_function=activation_func)
+        net = NeuralNetwork(sizes=input_sizes, cost_function=cost_func(), activation_function=activation_func())
         
         self.controller.update_network(net)
 

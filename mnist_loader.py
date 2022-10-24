@@ -1,10 +1,12 @@
 import gzip
 import numpy as np
+from PIL import Image
 import matplotlib.pyplot as plt
 
 import quickdraw
 import os
-import json
+
+import cProfile
 
 
 def load_images(rel_path, length, resolution=28, img_offset=16):
@@ -45,73 +47,53 @@ def split_validation_train_data(all_train_data, validation_data_num):
         train_data = all_train_data
     return train_data, validation_data
 
-
-def load_mnist(validation_data_num=10000):
-    test_images_path = "data/mnist/t10k-images-idx3-ubyte.gz"
-    test_labels_path = "data/mnist/t10k-labels-idx1-ubyte.gz"
-    test_data = load_data(test_images_path, test_labels_path)
-
-    train_images_path = "data/mnist/train-images-idx3-ubyte.gz"
-    train_labels_path = "data/mnist/train-labels-idx1-ubyte.gz"
-    all_train_data = load_data(train_images_path, train_labels_path)
-    train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
-    
-    return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
-
-def load_fashion(validation_data_num=10000):
-    test_images_path = "data/fashion/t10k-images-idx3-ubyte.gz"
-    test_labels_path = "data/fashion/t10k-labels-idx1-ubyte.gz"    
-    test_data = load_data(test_images_path, test_labels_path)
-
-    train_images_path = "data/fashion/train-images-idx3-ubyte.gz"
-    train_labels_path = "data/fashion/train-labels-idx1-ubyte.gz"
-    all_train_data = load_data(train_images_path, train_labels_path)
-    train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
-
-    return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
-
 def shuffle_data(data):
     new_data = data.copy()
     np.random.shuffle(new_data)
     return new_data
 
 def resize_image(image_arr, orig_size=256, desired_size=28):
-    step = int(orig_size / desired_size)
-    resized = []
-    for row_index in range(desired_size):
-        row = row_index * step
-        for col_index in range(desired_size):
-            col = col_index*step
-            resized.append((image_arr[row:row+step, col:col+step]).mean())
+    return np.array(Image.fromarray(image_arr).resize((desired_size, desired_size)))
+    # step = int(orig_size / desired_size)
+    # resized = []
+    # for row_index in range(desired_size):
+    #     row = row_index * step
+    #     for col_index in range(desired_size):
+    #         col = col_index*step
+    #         resized.append((image_arr[row:row+step, col:col+step]).mean())
 
-    resized_arr = np.asarray(resized)
-    return resized_arr
+    # resized_arr = np.asarray(resized)
+    # return resized_arr
+
+def quickdraw_category_path(category):
+    return f"data/quick_draw/{category}.npy"
 
 def check_saved(category):
-    file_name = f"data/quick_draw/{category}.json"
+    file_name = quickdraw_category_path(category)
     return os.path.exists(file_name)
 
 def load_doodles_from_file(category, category_number):
-    file_name = f"data/quick_draw/{category}.json"
-    with open(file_name, "r") as file:
-        data = json.load(file)
+    file_name = quickdraw_category_path(category)
+    
+    data = np.load(file_name, allow_pickle=True)
     data_to_return = [(np.asarray(image).reshape(784, 1), category_number) for image in data]
 
     return data_to_return
 
 def save_doodles_category(data, category):
-    file_name = f"data/quick_draw/{category}.json"
+    file_name = quickdraw_category_path(category)
     data_to_save = [image[0].tolist() for image in data]
-    with open(file_name, "w") as file:
-        json.dump(data_to_save, file)
+    np.save(file_name, data_to_save, allow_pickle=True)
 
-def load_doodle_category(category, num_of_drawings, category_number):
+def load_new_doodles_category(category, num_of_drawings, category_number):
     data = []
     data_group = quickdraw.QuickDrawDataGroup(category, recognized=True, max_drawings=num_of_drawings)
     for quick_draw_image in data_group.drawings:
-        image_arr = 1 - (np.asarray(quick_draw_image.image).mean(axis=2) / 255)
+        resized_image = quick_draw_image.image.resize((28, 28))
+        resized = 1 - (np.asarray(resized_image).mean(axis=2) / 255)
+        # image_arr = 1 - (np.asarray(quick_draw_image.image).mean(axis=2) / 255)
 
-        resized = resize_image(image_arr, 256, 28)
+        # resized = resize_image(image_arr, 256, 28)
         data.append((resized.reshape(784, 1), category_number))
     save_doodles_category(data, category)
     return data
@@ -134,7 +116,7 @@ def load_doodles(categories_list=None):
         if check_saved(category):
             data += load_doodles_from_file(category, category_index)
         else:
-            data += load_doodle_category(category, num_of_each_category, category_index)
+            data += load_new_doodles_category(category, num_of_each_category, category_index)
 
     totaL_train_length = total_data_length - totaL_test_length - total_validation_length
 
@@ -144,6 +126,31 @@ def load_doodles(categories_list=None):
     validation_data = vectorized[totaL_train_length + totaL_test_length:]
 
     return (train_data, validation_data, test_data)
+
+def load_fashion(validation_data_num=10000):
+    test_images_path = "data/fashion/t10k-images-idx3-ubyte.gz"
+    test_labels_path = "data/fashion/t10k-labels-idx1-ubyte.gz"    
+    test_data = load_data(test_images_path, test_labels_path)
+
+    train_images_path = "data/fashion/train-images-idx3-ubyte.gz"
+    train_labels_path = "data/fashion/train-labels-idx1-ubyte.gz"
+    all_train_data = load_data(train_images_path, train_labels_path)
+    train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
+
+    return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
+
+
+def load_mnist(validation_data_num=10000):
+    test_images_path = "data/mnist/t10k-images-idx3-ubyte.gz"
+    test_labels_path = "data/mnist/t10k-labels-idx1-ubyte.gz"
+    test_data = load_data(test_images_path, test_labels_path)
+
+    train_images_path = "data/mnist/train-images-idx3-ubyte.gz"
+    train_labels_path = "data/mnist/train-labels-idx1-ubyte.gz"
+    all_train_data = load_data(train_images_path, train_labels_path)
+    train_data, validation_data = split_validation_train_data(all_train_data, validation_data_num)
+    
+    return (vectorize(train_data), vectorize(validation_data), vectorize(test_data))
 
 
 def show_plot_images(data):
@@ -155,8 +162,12 @@ def show_plot_images(data):
         plt.imshow(shuffled_data[image_index][0].reshape(image_resolution, image_resolution), cmap=plt.get_cmap("gray"))
     plt.show()
 
+
 if __name__ == "__main__":
-    _, _, test_data_doodles = load_doodles()
+    with cProfile.Profile() as pr:
+        _, _, test_data_doodles = load_doodles()
+        pr.print_stats()
+
     _, _, test_data_mnist = load_mnist()
     show_plot_images(test_data_doodles)
     show_plot_images(test_data_mnist)

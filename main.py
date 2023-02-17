@@ -77,7 +77,6 @@ class NeuralNetworksGUI(tk.Tk):
 
     def show_frame(self, frame_name):
         self.current_frame = self.frames_dict[frame_name]
-        print(f"Opening {frame_name}")
         self.current_frame.update_elements()
         self.current_frame.tkraise()
 

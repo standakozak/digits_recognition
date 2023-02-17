@@ -3,6 +3,7 @@ import math
 import sys
 from abc import ABC, abstractmethod, abstractstaticmethod
 from typing import Optional, Union
+from copy import deepcopy
 
 import numpy as np
 from mnist_loader import load_mnist
@@ -128,6 +129,37 @@ def load_network(file_name:str):
     return net
 
 
+def run_with_early_stopping(net: "NeuralNetwork", training_data, validation_data, stopping_treshold=5, validations=None, **kwargs) -> "NeuralNetwork":
+    if validations == None:
+        validations = len(validation_data)
+    
+    best_accuracy = net.last_test_accuracy
+    best_network: NeuralNetwork = deepcopy(net)
+    counter = 0
+    epoch_num = 0
+
+    while counter < stopping_treshold:
+        epoch_num += 1
+        net.train_one_epoch(training_data=training_data, **kwargs)
+
+        correct_validations, total_validations, avg_validation_cost, _ = net.test_network(validation_data, validations)
+        net.last_test_cost = avg_validation_cost
+        net.last_test_accuracy = correct_validations / total_validations
+        
+
+        new_accuracy = net.last_test_accuracy
+        if new_accuracy > best_accuracy:
+            best_accuracy = new_accuracy
+            best_network = deepcopy(net)
+            counter = 0
+        else:
+            counter += 1
+        print(f"{epoch_num}th epoch completed")
+        print(f"Average epoch cost: {net.last_training_cost}")
+        print(f"Test: ({correct_validations} / {total_validations})   {(correct_validations * 100) / total_validations} %")
+    print(f"Returning network with accuracy: {best_accuracy * 100}%")
+    return best_network
+
 class Layer:
     def __init__(self, weights:list[list[float]], biases:list[float], cost_function:CostFunction, activation_func:ActivationFunction) -> None:
         # Sets the layer's weights and biases
@@ -215,9 +247,10 @@ class NeuralNetwork:
         else:
             self.layers = []
             inputs = sizes[0]
-            for layer_nodes in sizes[1:]:
+            for size_index, layer_nodes in enumerate(sizes[1:], start=1):
                 ## Creating a new layer
-                new_weights = np.random.randn(layer_nodes, inputs)
+                standard_deviation = 1 / math.sqrt(sizes[size_index-1])
+                new_weights = standard_deviation * np.random.randn(layer_nodes, inputs)
                 new_biases = list(np.random.randn(layer_nodes, 1))
 
                 new_layer = Layer(weights=new_weights, biases=new_biases, 
@@ -270,46 +303,47 @@ class NeuralNetwork:
 
             if monitor_cost:
                 test_cost += self.cost_function.calculate_cost(real_outputs, desired_outputs)
+        
         return correct_answers_num, num_of_datapoints, test_cost/num_of_datapoints, answers
 
-    def train_network(
-            self, training_data: list[tuple[np.ndarray, np.ndarray]], mini_batch_size=10, learning_rate=0.05, 
-            test_data: Optional[list[tuple[np.ndarray, np.ndarray]]] = None, tests: Optional[int] = None,
-            epochs=1, regularization:float=0.0, monitor_accuracy=False
-        ):
+    def train_one_epoch(self, training_data: list[tuple[np.ndarray, np.ndarray]], mini_batch_size=10, learning_rate=0.05, regularization:float=0.0, monitor_accuracy=False):
         total_inputs = len(training_data)
-        total_correct = 0
-        total_cost: float = 0.0
+        epoch_cost = 0
+        mini_batches = make_mini_batches(training_data, mini_batch_size)
+        epoch_correct_answers = 0
+
+        for mini_batch in mini_batches:
+            delta_gradient_w = [np.zeros(layer.weights.shape) for layer in self.layers]
+            delta_gradient_b = [np.zeros(layer.biases.shape) for layer in self.layers]
+
+            for datapoint_input, datapoint_output in mini_batch:
+                delta_gradient_w, delta_gradient_b, cost = self.update_gradients(datapoint_input, datapoint_output, delta_gradient_w, delta_gradient_b)
+                
+                if monitor_accuracy:
+                    activations = self.process_input(datapoint_input)
+                    epoch_correct_answers += int(classify_output(activations, datapoint_output))
+
+            self.apply_gradients(delta_gradient_w, delta_gradient_b, learning_rate/mini_batch_size, regularization/len(mini_batches))
+            epoch_cost += cost
+    
+        self.last_training_cost = epoch_cost / total_inputs
+        self.last_training_accuracy = epoch_correct_answers / total_inputs
+
+    def train_network(
+            self, training_data: list[tuple[np.ndarray, np.ndarray]], 
+            validation_data: Optional[list[tuple[np.ndarray, np.ndarray]]] = None, validations: Optional[int] = None, epochs=1, **kwargs
+        ):
         for epoch_num in range(epochs):
-            epoch_cost = 0
-            mini_batches = make_mini_batches(training_data, mini_batch_size)
-            epoch_correct_answers = 0
-
-            for mini_batch in mini_batches:
-                delta_gradient_w = [np.zeros(layer.weights.shape) for layer in self.layers]
-                delta_gradient_b = [np.zeros(layer.biases.shape) for layer in self.layers]
-
-                for datapoint_input, datapoint_output in mini_batch:
-                    delta_gradient_w, delta_gradient_b, cost = self.update_gradients(datapoint_input, datapoint_output, delta_gradient_w, delta_gradient_b)
-                    
-                    if monitor_accuracy:
-                        activations = self.process_input(datapoint_input)
-                        epoch_correct_answers += int(classify_output(activations, datapoint_output))
-
-                self.apply_gradients(delta_gradient_w, delta_gradient_b, learning_rate/mini_batch_size, regularization/len(mini_batches))
-                epoch_cost += cost
-
-            total_cost += epoch_cost
-            total_correct += epoch_correct_answers
+            self.train_one_epoch(training_data, **kwargs)
+            
+            print(f"{epoch_num+1}th epoch completed ({epoch_num + 1}/{epochs})")
+            print(f"Average epoch cost: {self.last_training_cost}")
             # Testing after each epoch
-            if test_data is not None:
-                print(f"{epoch_num+1}th epoch completed ({(epoch_num + 1)}/{epochs})")
-                print(f"Average epoch cost: {epoch_cost/total_inputs}")
-                correct, total, _, _ = self.test_network(test_data, tests)
-                print(f"Test: ({correct} / {total})   {(correct * 100) / total} %")
-        
-        self.last_training_cost = total_cost / (epochs * total_inputs)
-        self.last_training_accuracy = total_correct / (epochs * total_inputs)
+            if validation_data is not None:
+                correct_validations, total_validations, avg_validation_cost, _ = self.test_network(validation_data, validations)
+                self.last_test_cost = avg_validation_cost
+                self.last_test_accuracy = correct_validations / total_validations
+                print(f"Test: ({correct_validations} / {total_validations})   {(correct_validations * 100) / total_validations} %")
 
     def update_gradients(self, dp_input: np.ndarray, expected_output: np.ndarray, gradient_w: list[np.ndarray], gradient_b: list[np.ndarray]):
         """
@@ -377,5 +411,6 @@ class NeuralNetwork:
 
 if __name__ == "__main__":
     digits_network = NeuralNetwork([784, 30, 10], cost_function=CrossEntropyCost())
-    training_data, validation_data, test_data = load_mnist()
-    digits_network.train_network(training_data, mini_batch_size=10, learning_rate=0.5, test_data=test_data, tests=10000, epochs=10)
+    digits_network.save_network("mnist_cec_test_short")
+    #training_data, validation_data, test_data = load_mnist()
+    #digits_network.train_network(training_data[:1000], mini_batch_size=10, learning_rate=0.5, test_data=test_data, tests=10000, epochs=10)

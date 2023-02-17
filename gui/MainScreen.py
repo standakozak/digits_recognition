@@ -97,7 +97,7 @@ class MainScreen(tk.Frame):
         # Regularization parameter input field
         tk.Label(bottom_inputs_frame, text='Regularization parameter:', font=('arial', 12, 'normal')).grid(row=3, column=0, sticky="e")
         self.regularization_box = tk.Entry(bottom_inputs_frame, font=('arial', 12, 'normal'))
-        self.regularization_box.insert(0, "1")
+        self.regularization_box.insert(0, "0.0")
         self.regularization_box.grid(row=3, column=1, sticky="w")
 
         # Number of epochs spinbox
@@ -208,7 +208,7 @@ class MainScreen(tk.Frame):
         dataset = self.dataset_box.get()
         mini_batch_size = int(self.mini_batch_size_box.get())
         learning_rate = float(self.learning_rate_box.get())
-        regularization = int(self.regularization_box.get())
+        regularization = float(self.regularization_box.get())
         epochs = int(self.epoch_box.get())
         stop_after_epoch = self.stop_after_epoch_var.get()
         tests_after_epoch = max(1, int(self.tests_num_box.get()))
